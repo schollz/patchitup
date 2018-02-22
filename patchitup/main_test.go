@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,6 +15,7 @@ func TestPatchUp(t *testing.T) {
 		err := Run("8002")
 		assert.Nil(t, err)
 	}()
+	time.Sleep(100 * time.Millisecond)
 
 	//
 	// test on clean directory
