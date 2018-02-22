@@ -91,7 +91,7 @@ func handlerLines(c *gin.Context) {
 	if err != nil {
 		log.Error(err)
 	}
-	log.Debugf("response: %+v", response)
+	log.Debugf("response: %s", bResponse)
 	c.Data(http.StatusOK, "application/json", bResponse)
 }
 

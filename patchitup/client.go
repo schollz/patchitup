@@ -19,6 +19,7 @@ func init() {
 
 // PatchUp will take a filename and upload it to the server via a patch.
 func PatchUp(address, username, pathToFile string) (err error) {
+	defer log.Flush()
 	log.Debugf("check if '%s' exists", pathToFile)
 	if !Exists(pathToFile) {
 		return fmt.Errorf("'%s' not found", pathToFile)
