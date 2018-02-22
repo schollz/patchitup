@@ -15,24 +15,40 @@ func TestPatchUp(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
+	//
 	// test on clean directory
+	//
 	err := os.RemoveAll(path.Join(UserHomeDir(), ".patchitup"))
 	assert.Nil(t, err)
-	err = CopyFile("client.go", "test1")
+	err = CopyFile("client.go", "../test1")
 	assert.Nil(t, err)
 
-	err = PatchUp("http://localhost:8002", "testuser", "test1")
+	err = PatchUp("http://localhost:8002", "testuser", "../test1")
 	assert.Nil(t, err)
+	// check that it copied correctly
+	originalHash, err := Filemd5Sum("../test1")
+	assert.Nil(t, err)
+	serverHash, err := Filemd5Sum(path.Join(UserHomeDir(), ".patchitup", "server", "testuser", "test1"))
+	assert.Nil(t, err)
+	assert.Equal(t, originalHash, serverHash)
 
+	//
 	// remove the client folder to see if it reconstructs
+	//
 	err = os.RemoveAll(path.Join(UserHomeDir(), ".patchitup", "client"))
 	assert.Nil(t, err)
 	// change the test file
-	err = CopyFile("server.go", "test1")
+	os.Remove("../test1")
+	err = CopyFile("server.go", "../test1")
 	assert.Nil(t, err)
 
-	err = PatchUp("http://localhost:8002", "testuser", "test1")
+	err = PatchUp("http://localhost:8002", "testuser", "../test1")
 	assert.Nil(t, err)
+	// check that it copied correctly
+	originalHash, err = Filemd5Sum("../test1")
+	assert.Nil(t, err)
+	serverHash, err = Filemd5Sum(path.Join(UserHomeDir(), ".patchitup", "server", "testuser", "test1"))
+	assert.Nil(t, err)
+	assert.Equal(t, originalHash, serverHash)
 
-	os.Remove("test1")
 }
