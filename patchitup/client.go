@@ -37,7 +37,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	pathToRemoteCopy := path.Join(pathToCacheClient, username, filename)
 
 	// copy current state of file
-	err = CopyFile(pathToFile, pathToFile+".temp")
+	err = CopyFile(pathToFile, filename+".temp")
 	if err != nil {
 		return
 	}
@@ -52,14 +52,11 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	err = ioutil.WriteFile(pathToRemoteCopy, []byte(remoteCopyText), 0755)
 
 	// get patches
-	localText, err := getFileText(pathToFile + ".temp")
+	localText, err := getFileText(filename + ".temp")
 	if err != nil {
 		return err
 	}
 	patch := getPatch(remoteCopyText, string(localText))
-	log.Debugf("text1: '%v'", []byte(remoteCopyText))
-	log.Debugf("text2: '%v'", []byte(localText))
-	log.Debugf("patch: %+v", patch)
 
 	// upload patches
 	err = uploadPatches(patch, address, username, pathToFile)
@@ -173,7 +170,7 @@ func getRemoteCopyHashLines(remoteHashLineNumbers map[string][]int, address, use
 	defer file.Close()
 
 	log.Debug("determining which lines in current file are in the remote copy")
-	hashLines, err = getHashLines(pathToFile + ".temp")
+	hashLines, err = getHashLines(filename + ".temp")
 	if err != nil {
 		return
 	}

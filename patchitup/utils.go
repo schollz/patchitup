@@ -12,7 +12,7 @@ import (
 func HashSHA256(s []byte) string {
 	h := sha256.New()
 	h.Write(s)
-	return string(base64.StdEncoding.EncodeToString(h.Sum(nil)))
+	return string(base64.StdEncoding.EncodeToString(h.Sum(nil)))[:8]
 }
 
 // UserHomeDir returns the user home directory

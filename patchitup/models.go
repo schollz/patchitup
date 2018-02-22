@@ -2,9 +2,9 @@ package patchitup
 
 import (
 	"bufio"
-	"bytes"
+	"io/ioutil"
 	"os"
-	"strings"
+	"regexp"
 )
 
 type serverRequest struct {
@@ -22,31 +22,12 @@ type serverResponse struct {
 	HashLineText    map[string][]byte `json:"hash_linetext"`
 }
 
-func getFileText(pathToFile string) (fileText string, err error) {
-	file, err := os.Open(pathToFile)
-	if err != nil {
-		return
-	}
-	scanner := bufio.NewScanner(file)
-	lineNumber := 0
-	for scanner.Scan() {
-		lineNumber++
-	}
-	file.Close()
+var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)
 
-	file, err = os.Open(pathToFile)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	lines := make([]string, lineNumber)
-	scanner = bufio.NewScanner(file)
-	lineNumber = 0
-	for scanner.Scan() {
-		lines[lineNumber] = strings.TrimRight(scanner.Text())
-		lineNumber++
-	}
-	fileText = strings.Join(lines, "\n")
+func getFileText(pathToFile string) (fileText string, err error) {
+	bFile, err := ioutil.ReadFile(pathToFile)
+	bFile = convertWindowsLineFeed.ReplaceAll(bFile, []byte("\n"))
+	fileText = string(bFile)
 	return
 }
 
@@ -61,7 +42,7 @@ func getHashLineNumbers(pathToFile string) (lines map[string][]int, err error) {
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
 	for scanner.Scan() {
-		h := HashSHA256(bytes.TrimRight(scanner.Bytes()))
+		h := HashSHA256(convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n")))
 		if _, ok := lines[h]; !ok {
 			lines[h] = []int{}
 		}
@@ -83,7 +64,7 @@ func getHashLines(pathToFile string) (lines map[string][]byte, err error) {
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
-		line := bytes.TrimRight(scanner.Bytes())
+		line := convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n"))
 		h := HashSHA256(line)
 		lines[h] = line
 	}
