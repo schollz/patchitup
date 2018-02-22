@@ -22,9 +22,10 @@ func main() {
 	patchitup.SetLogLevel("debug")
 	var err error
 	if !server {
+		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
 	} else {
-		err = patchitup.PatchUp("http://localhost:8002", "zack", "README.md")
+		err = patchitup.PatchUp("http://localhost:8002", "zack", "main.go")
 	}
 	if err != nil {
 		fmt.Println(err)

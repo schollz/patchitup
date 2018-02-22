@@ -1,7 +1,6 @@
 package patchitup
 
 import (
-	"bufio"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -28,20 +27,72 @@ func Run(port string) (err error) {
 	r.HEAD("/", func(c *gin.Context) { // handler for the uptime robot
 		c.String(http.StatusOK, "OK")
 	})
-	r.POST("/lines", handlerLines)
+	r.POST("/lineNumbers", handlerLineNumbers) // returns hash and line numbers
+	r.POST("/lineText", handlerLineText)       // returns hash and line text
+	r.POST("/patch", handlerPatch)             // patch a file
 	log.Infof("Running at http://0.0.0.0:" + port)
 	err = r.Run(":" + port)
 	return
 }
 
-func handlerLines(c *gin.Context) {
-	lines, message, err := func(c *gin.Context) (lines map[string][]int, message string, err error) {
-		lines = make(map[string][]int)
+func handlerPatch(c *gin.Context) {
+	message, err := func(c *gin.Context) (message string, err error) {
 		var sr serverRequest
 		err = c.ShouldBindJSON(&sr)
 		if err != nil {
 			return
 		}
+		if len(sr.Patch) == 0 {
+			err = errors.New("no patch supplied")
+			return
+		}
+		log.Infof("%s/%s upload: %d", sr.Username, sr.Filename, c.Request.ContentLength)
+
+		// create cache directory
+		if !Exists(path.Join(pathToCacheServer, sr.Username)) {
+			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
+		}
+		pathToFile := path.Join(pathToCacheServer, sr.Username, sr.Filename)
+		if !Exists(pathToFile) {
+			message = "created new file"
+			newFile, err2 := os.Create(pathToFile)
+			if err2 != nil {
+				err = errors.Wrap(err2, "problem creating file")
+				return
+			}
+			newFile.Close()
+			return
+		}
+
+		err = patchFile(pathToFile, sr.Patch)
+		if err == nil {
+			message = "applied patch"
+		}
+		return
+	}(c)
+	if err != nil {
+		message = err.Error()
+	}
+
+	sr := serverResponse{
+		Message: message,
+		Success: err == nil,
+	}
+	bSR, _ := json.Marshal(sr)
+	log.Infof("download: %d", len(bSR))
+	c.JSON(http.StatusOK, sr)
+}
+
+func handlerLineText(c *gin.Context) {
+	lines, message, err := func(c *gin.Context) (lines map[string][]byte, message string, err error) {
+		lines = make(map[string][]byte)
+		var sr serverRequest
+		err = c.ShouldBindJSON(&sr)
+		if err != nil {
+			return
+		}
+		log.Infof("%s/%s upload: %d", sr.Username, sr.Filename, c.Request.ContentLength)
+
 		// create cache directory
 		if !Exists(path.Join(pathToCacheServer, sr.Username)) {
 			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
@@ -59,21 +110,16 @@ func handlerLines(c *gin.Context) {
 		}
 
 		// file exists, read it line by line
-		file, err := os.Open(pathToFile)
+		allLines, err := getHashLines(pathToFile)
 		if err != nil {
 			return
 		}
-		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		lineNumber := 0
-		for scanner.Scan() {
-			lineNumber++
-			h := HashSHA256(scanner.Bytes())
-			if _, ok := lines[h]; !ok {
-				lines[h] = []int{}
+		// filter out by only the ones needed
+		for line := range allLines {
+			if _, ok := sr.MissingLines[line]; ok {
+				lines[line] = allLines[line]
 			}
-			lines[h] = append(lines[h], lineNumber)
 		}
 		message = "wrote lines"
 		return
@@ -82,17 +128,60 @@ func handlerLines(c *gin.Context) {
 		message = err.Error()
 	}
 
-	response := serverResponse{
+	sr := serverResponse{
+		Message:      message,
+		Success:      err == nil,
+		HashLineText: lines,
+	}
+	bSR, _ := json.Marshal(sr)
+	log.Infof("download: %d", len(bSR))
+	c.JSON(http.StatusOK, sr)
+}
+func handlerLineNumbers(c *gin.Context) {
+	lines, message, err := func(c *gin.Context) (lines map[string][]int, message string, err error) {
+		lines = make(map[string][]int)
+		var sr serverRequest
+		err = c.ShouldBindJSON(&sr)
+		if err != nil {
+			return
+		}
+		log.Infof("%s/%s upload: %d", sr.Username, sr.Filename, c.Request.ContentLength)
+
+		// create cache directory
+		if !Exists(path.Join(pathToCacheServer, sr.Username)) {
+			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
+		}
+		pathToFile := path.Join(pathToCacheServer, sr.Username, sr.Filename)
+		if !Exists(pathToFile) {
+			message = "created new file"
+			newFile, err2 := os.Create(pathToFile)
+			if err2 != nil {
+				err = errors.Wrap(err2, "problem creating file")
+				return
+			}
+			newFile.Close()
+			return
+		}
+
+		// file exists, read it line by line
+		lines, err = getHashLineNumbers(pathToFile)
+		if err != nil {
+			return
+		}
+		message = "wrote lines"
+		return
+	}(c)
+	if err != nil {
+		message = err.Error()
+	}
+	sr := serverResponse{
 		Message:         message,
 		Success:         err == nil,
 		HashLinenumbers: lines,
 	}
-	bResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Error(err)
-	}
-	log.Debugf("response: %s", bResponse)
-	c.Data(http.StatusOK, "application/json", bResponse)
+	bSR, _ := json.Marshal(sr)
+	log.Infof("download: %d", len(bSR))
+	c.JSON(http.StatusOK, sr)
 }
 
 func middleWareHandler() gin.HandlerFunc {
