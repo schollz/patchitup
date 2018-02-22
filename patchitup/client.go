@@ -12,18 +12,22 @@ import (
 	"strings"
 
 	log "github.com/cihub/seelog"
+	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 
 func init() {
+	// make the directory for the client
 	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "client"), 0755)
 }
 
 // PatchUp will take a filename and upload it to the server via a patch.
 func PatchUp(address, username, pathToFile string) (err error) {
+	// flush logs so that they show up
 	defer log.Flush()
 	_, filename := filepath.Split(pathToFile)
 
+	// first make sure the file to upload exists
 	log.Debugf("check if '%s' exists", pathToFile)
 	if !Exists(pathToFile) {
 		return fmt.Errorf("'%s' not found", pathToFile)
@@ -38,47 +42,80 @@ func PatchUp(address, username, pathToFile string) (err error) {
 
 	// copy current state of file
 	err = CopyFile(pathToFile, filename+".temp")
+	defer os.Remove(filename + ".temp")
 	if err != nil {
 		return
 	}
 
-	// reconstruct file from remote
-	log.Debug("reconstructing from remote")
-	remoteCopyText, err := reconstructCopyFromRemote(address, username, filename)
+	// get the latest hash from remote
+	localHash, err := Filemd5Sum(pathToFile)
 	if err != nil {
-		return errors.Wrap(err, "problem reconstructing: ")
+		return
 	}
-	log.Debugf("reconstructed remote copy text: %s", remoteCopyText)
-	err = ioutil.WriteFile(pathToRemoteCopy, []byte(remoteCopyText), 0755)
+	remoteHash, err := getLatestHash(address, username, pathToFile)
+	if err != nil {
+		return
+	}
+	log.Debugf("local hash: %s", localHash)
+	log.Debugf("remote hash: %s", remoteHash)
+	if localHash == remoteHash {
+		return
+	}
 
-	// get patches
+	// check hash of the cached remote copy and the remote copy
+	localRemoteHash, err := Filemd5Sum(pathToRemoteCopy)
+	log.Debugf("local remote hash: %s", localRemoteHash)
+	if localRemoteHash != remoteHash {
+		// local remote copy and remote is out of data
+		// reconstruct file from remote
+		log.Debug("reconstructing from remote")
+		remoteCopyText, err := reconstructCopyFromRemote(address, username, filename)
+		if err != nil {
+			return errors.Wrap(err, "problem reconstructing: ")
+		}
+		err = ioutil.WriteFile(pathToRemoteCopy, []byte(remoteCopyText), 0755)
+	} else {
+		// local remote copy replicate of the remote file, so it can be used to generate diff
+		log.Debug("local remote is up-to-date, not reconstructing")
+	}
+
+	// get patches between the local version and the local remote version
+	localRemoteText, err := getFileText(pathToRemoteCopy)
+	if err != nil {
+		return err
+	}
 	localText, err := getFileText(filename + ".temp")
 	if err != nil {
 		return err
 	}
-	patch := getPatch(remoteCopyText, string(localText))
+	patch := getPatch(localRemoteText, localText)
 
 	// upload patches
 	err = uploadPatches(patch, address, username, pathToFile)
+	if err != nil {
+		return err
+	} else {
+		fmt.Printf("patched %s to remote '%s' for '%s'\n", humanize.Bytes(uint64(len(patch))), filename, username)
+	}
+
+	// update the local remote copy
+	err = ioutil.WriteFile(pathToRemoteCopy, convertWindowsLineFeed.ReplaceAll([]byte(localText), []byte("\n")), 0755)
+	if err != nil {
+		return err
+	}
+
 	return
 }
 
-func uploadPatches(patch string, address, username, pathToFile string) (err error) {
-	_, filename := filepath.Split(pathToFile)
-
-	// ask for lines from server
-	sr := serverRequest{
-		Username: username,
-		Filename: filename,
-		Patch:    patch,
-	}
+// postToServer is generic function to post to the server
+func postToServer(address string, sr serverRequest) (target serverResponse, err error) {
 	payloadBytes, err := json.Marshal(sr)
 	if err != nil {
 		return
 	}
 	body := bytes.NewReader(payloadBytes)
 
-	req, err := http.NewRequest("POST", address+"/patch", body)
+	req, err := http.NewRequest("POST", address, body)
 	if err != nil {
 		return
 	}
@@ -90,16 +127,40 @@ func uploadPatches(patch string, address, username, pathToFile string) (err erro
 	}
 	defer resp.Body.Close()
 
-	var target serverResponse
 	err = json.NewDecoder(resp.Body).Decode(&target)
 	if err != nil {
 		return
 	}
 	if !target.Success {
 		err = errors.New(target.Message)
-		return
 	}
-	log.Debugf("POST /patch: %s", target.Message)
+	log.Debugf("POST %s: %s", address, target.Message)
+	return
+}
+
+// getLatestHash will get latest hash from server
+func getLatestHash(address, username, pathToFile string) (fileHash string, err error) {
+	_, filename := filepath.Split(pathToFile)
+
+	sr := serverRequest{
+		Username: username,
+		Filename: filename,
+	}
+	target, err := postToServer(address+"/fileHash", sr)
+	fileHash = target.Message
+	return
+}
+
+// uploadPatches will upload the patch to the server
+func uploadPatches(patch string, address, username, pathToFile string) (err error) {
+	_, filename := filepath.Split(pathToFile)
+
+	sr := serverRequest{
+		Username: username,
+		Filename: filename,
+		Patch:    patch,
+	}
+	_, err = postToServer(address+"/patch", sr)
 	return
 }
 
@@ -113,33 +174,7 @@ func getRemoteCopyHashLineNumbers(address, username, pathToFile string) (hashLin
 		Username: username,
 		Filename: filename,
 	}
-	payloadBytes, err := json.Marshal(sr)
-	if err != nil {
-		return
-	}
-	body := bytes.NewReader(payloadBytes)
-
-	req, err := http.NewRequest("POST", address+"/lineNumbers", body)
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	var target serverResponse
-	err = json.NewDecoder(resp.Body).Decode(&target)
-	if err != nil {
-		return
-	}
-	if !target.Success {
-		err = errors.New(target.Message)
-		return
-	}
+	target, err := postToServer(address+"/lineNumbers", sr)
 	hashLineNumbers = target.HashLinenumbers
 	return
 }
@@ -174,7 +209,7 @@ func getRemoteCopyHashLines(remoteHashLineNumbers map[string][]int, address, use
 	if err != nil {
 		return
 	}
-	log.Debugf("currentLines: %+v", hashLines)
+
 	missingLines := make(map[string]struct{})
 	for h := range remoteHashLineNumbers {
 		if _, ok := hashLines[h]; !ok {
@@ -186,45 +221,14 @@ func getRemoteCopyHashLines(remoteHashLineNumbers map[string][]int, address, use
 		log.Debug("not missing any lines")
 		return
 	}
-	log.Debugf("requesting missing: %+v", missingLines)
 
-	//
-	// MAKE REQUEST FROM SERVER FOR MISSING LINES
-	//
 	sr := serverRequest{
 		Username:     username,
 		Filename:     filename,
 		MissingLines: missingLines,
 	}
-	payloadBytes, err := json.Marshal(sr)
-	if err != nil {
-		return
-	}
-	body := bytes.NewReader(payloadBytes)
+	target, err := postToServer(address+"/lineText", sr)
 
-	req, err := http.NewRequest("POST", address+"/lineText", body)
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	var target serverResponse
-	err = json.NewDecoder(resp.Body).Decode(&target)
-	if err != nil {
-		return
-	}
-	if !target.Success {
-		err = errors.New(target.Message)
-		return
-	}
-
-	log.Debugf("needed lines: %+v", target.HashLineText)
 	for line := range target.HashLineText {
 		hashLines[line] = target.HashLineText[line]
 	}
@@ -236,13 +240,11 @@ func reconstructCopyFromRemote(address, username, pathToFile string) (reconstruc
 	if err != nil {
 		return
 	}
-	log.Debugf("remoteHashLineNumbers: %+v", remoteHashLineNumbers)
 
 	hashLines, err := getRemoteCopyHashLines(remoteHashLineNumbers, address, username, pathToFile)
 	if err != nil {
 		return
 	}
-	log.Debug("all lines: %+v", hashLines)
 
 	// reconstruct the file
 	numberLines := 0
@@ -258,7 +260,7 @@ func reconstructCopyFromRemote(address, username, pathToFile string) (reconstruc
 
 	for h := range remoteHashLineNumbers {
 		for _, lineNum := range remoteHashLineNumbers[h] {
-			lines[lineNum] = string(hashLines[h])
+			lines[lineNum] = string(convertWindowsLineFeed.ReplaceAll(hashLines[h], []byte("\n")))
 		}
 	}
 

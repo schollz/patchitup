@@ -1,13 +1,33 @@
 package patchitup
 
 import (
+	"bufio"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
 )
+
+// Filemd5Sum returns the md5 sum of a file
+func Filemd5Sum(pathToFile string) (result string, err error) {
+	file, err := os.Open(pathToFile)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	hash := md5.New()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n"))
+		hash.Write(line)
+	}
+	result = hex.EncodeToString(hash.Sum(nil))
+	return
+}
 
 func HashSHA256(s []byte) string {
 	h := sha256.New()
