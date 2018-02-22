@@ -16,13 +16,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func init() {
-	// make the directory for the client
-	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "client"), 0755)
-}
-
 // PatchUp will take a filename and upload it to the server via a patch.
 func PatchUp(address, username, pathToFile string) (err error) {
+	// make the directory for the client
+	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "client"), 0755)
+
 	// flush logs so that they show up
 	defer log.Flush()
 	_, filename := filepath.Split(pathToFile)

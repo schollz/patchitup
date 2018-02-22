@@ -14,12 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func init() {
-	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "server"), 0755)
-}
-
 // Run will run the main program
 func Run(port string) (err error) {
+	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "server"), 0755)
+
 	defer log.Flush()
 	// setup gin server
 	gin.SetMode(gin.ReleaseMode)
