@@ -16,16 +16,20 @@ func TestPatchUp(t *testing.T) {
 	}()
 
 	// test on clean directory
-	os.RemoveAll(path.Join(UserHomeDir(), ".patchitup"))
-	CopyFile("client.go", "test1")
+	err := os.RemoveAll(path.Join(UserHomeDir(), ".patchitup"))
+	assert.Nil(t, err)
+	err = CopyFile("client.go", "test1")
+	assert.Nil(t, err)
 
-	err := PatchUp("http://localhost:8002", "testuser", "test1")
+	err = PatchUp("http://localhost:8002", "testuser", "test1")
 	assert.Nil(t, err)
 
 	// remove the client folder to see if it reconstructs
-	os.RemoveAll(path.Join(UserHomeDir(), ".patchitup", "client"))
+	err = os.RemoveAll(path.Join(UserHomeDir(), ".patchitup", "client"))
+	assert.Nil(t, err)
 	// change the test file
-	CopyFile("server.go", "test1")
+	err = CopyFile("server.go", "test1")
+	assert.Nil(t, err)
 
 	err = PatchUp("http://localhost:8002", "testuser", "test1")
 	assert.Nil(t, err)
