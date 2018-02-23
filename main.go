@@ -31,7 +31,7 @@ func main() {
 		patchitup.SetLogLevel("info")
 	}
 	var err error
-	if !server {
+	if server {
 		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
 	} else {

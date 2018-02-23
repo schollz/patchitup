@@ -15,7 +15,7 @@
 
 # Why?
 
-sqlite3
+I wanted an easy way to make incremental backups of SQLITE3 databases.
 
 # Usage
 
