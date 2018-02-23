@@ -2,12 +2,15 @@ package patchitup
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	math_rand "math/rand"
 	"os"
 	"runtime"
@@ -152,4 +155,38 @@ func RandStringBytesMaskImprSrc(n int) string {
 	}
 
 	return string(b)
+}
+
+func GunzipBytes(compressed []byte) (uncompressed []byte, err error) {
+	if len(compressed) == 0 {
+		uncompressed = compressed
+		return
+	}
+	gr, err := gzip.NewReader(bytes.NewBuffer(compressed))
+	if err != nil {
+		return
+	}
+	defer gr.Close()
+	uncompressed, err = ioutil.ReadAll(gr)
+	return
+}
+
+func GzipBytes(uncompressed []byte) (compressed []byte, err error) {
+	if len(uncompressed) == 0 {
+		compressed = uncompressed
+		return
+	}
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err = gz.Write(uncompressed); err != nil {
+		return
+	}
+	if err = gz.Flush(); err != nil {
+		return
+	}
+	if err = gz.Close(); err != nil {
+		return
+	}
+	compressed = b.Bytes()
+	return
 }

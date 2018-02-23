@@ -178,6 +178,7 @@ func handlerLineText(c *gin.Context) {
 	log.Infof("download: %s", humanize.Bytes(uint64(len(bSR))))
 	c.JSON(http.StatusOK, sr)
 }
+
 func handlerLineNumbers(c *gin.Context) {
 	lines, message, err := func(c *gin.Context) (lines map[string][]int, message string, err error) {
 		lines = make(map[string][]int)

@@ -105,10 +105,22 @@ func PatchUp(address, username, pathToFile string) (err error) {
 
 	// copy current state of file
 	err = CopyFile(pathToFile, filename+".temp")
-	defer os.Remove(filename + ".temp")
 	if err != nil {
 		return
 	}
+	copiedBytes, err := ioutil.ReadFile(filename + ".temp")
+	if err != nil {
+		return
+	}
+	compressedBytes, err := GzipBytes(copiedBytes)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(filename+".temp", compressedBytes, 0755)
+	if err != nil {
+		return
+	}
+	defer os.Remove(filename + ".temp")
 
 	// get the latest hash from remote
 	localHash, err := Filemd5Sum(pathToFile)
@@ -128,7 +140,11 @@ func PatchUp(address, username, pathToFile string) (err error) {
 
 	// check hash of the cached remote copy and the remote copy
 	localRemoteHash, err := Filemd5Sum(pathToRemoteCopy)
-	log.Debugf("local remote hash: %s", localRemoteHash)
+	if err != nil {
+		log.Debug("local remote hash: n/a")
+	} else {
+		log.Debugf("local remote hash: %s", localRemoteHash)
+	}
 	if localRemoteHash != remoteHash {
 		// local remote copy and remote is out of data
 		// reconstruct file from remote
@@ -137,7 +153,11 @@ func PatchUp(address, username, pathToFile string) (err error) {
 		if err != nil {
 			return errors.Wrap(err, "problem reconstructing: ")
 		}
-		err = ioutil.WriteFile(pathToRemoteCopy, []byte(remoteCopyText), 0755)
+		compressedRemote, err := GzipBytes([]byte(remoteCopyText))
+		if err != nil {
+			return errors.Wrap(err, "problem reconstructing: ")
+		}
+		err = ioutil.WriteFile(pathToRemoteCopy, []byte(compressedRemote), 0755)
 	} else {
 		// local remote copy replicate of the remote file, so it can be used to generate diff
 		log.Debug("local remote is up-to-date, not reconstructing")
@@ -163,7 +183,12 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	}
 
 	// update the local remote copy
-	err = ioutil.WriteFile(pathToRemoteCopy, convertWindowsLineFeed.ReplaceAll([]byte(localText), []byte("\n")), 0755)
+	localBytes := convertWindowsLineFeed.ReplaceAll([]byte(localText), []byte("\n"))
+	compressedLocalBytes, err := GzipBytes(localBytes)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(pathToRemoteCopy, compressedLocalBytes, 0755)
 	if err != nil {
 		return err
 	}
@@ -303,11 +328,13 @@ func getRemoteCopyHashLines(remoteHashLineNumbers map[string][]int, address, use
 func reconstructCopyFromRemote(address, username, pathToFile string) (reconstructedFile string, err error) {
 	remoteHashLineNumbers, err := getRemoteCopyHashLineNumbers(address, username, pathToFile)
 	if err != nil {
+		err = errors.Wrap(err, "getRemoteCopyHashLineNumbers: ")
 		return
 	}
 
 	hashLines, err := getRemoteCopyHashLines(remoteHashLineNumbers, address, username, pathToFile)
 	if err != nil {
+		err = errors.Wrap(err, "getRemoteCopyHashLines: ")
 		return
 	}
 

@@ -48,6 +48,8 @@ $ patchitup -u me -s http://localhost:8002 -f SOMEFILE
 
 The first time you patch will basically just send up the gzipped file. Subsequent edits will just send up the patches. The percentage (e.g. `9.9%`) specifies the percentage of the entire file size that is being sent (to get an idea of bandwidth savings). The server also will log bandwidth usage.
 
+Everything stays gzipped on disk.
+
 
 # How does it work?
 

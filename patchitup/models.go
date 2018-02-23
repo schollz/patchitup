@@ -2,9 +2,12 @@ package patchitup
 
 import (
 	"bufio"
+	"compress/gzip"
 	"io/ioutil"
 	"os"
 	"regexp"
+
+	"github.com/pkg/errors"
 )
 
 type serverRequest struct {
@@ -26,6 +29,13 @@ var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)
 
 func getFileText(pathToFile string) (fileText string, err error) {
 	bFile, err := ioutil.ReadFile(pathToFile)
+	if err != nil {
+		return
+	}
+	bFile, err = GunzipBytes(bFile)
+	if err != nil {
+		return
+	}
 	bFile = convertWindowsLineFeed.ReplaceAll(bFile, []byte("\n"))
 	fileText = string(bFile)
 	return
@@ -35,11 +45,17 @@ func getHashLineNumbers(pathToFile string) (lines map[string][]int, err error) {
 	lines = make(map[string][]int)
 	file, err := os.Open(pathToFile)
 	if err != nil {
+		err = errors.New("problem opening file")
 		return
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	fz, err := gzip.NewReader(file)
+	if err != nil {
+		err = nil
+		return
+	}
+	scanner := bufio.NewScanner(fz)
 	lineNumber := 0
 	for scanner.Scan() {
 		h := HashSHA256(convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n")))
@@ -60,7 +76,8 @@ func getHashLines(pathToFile string) (lines map[string][]byte, err error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	fz, err := gzip.NewReader(file)
+	scanner := bufio.NewScanner(fz)
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
