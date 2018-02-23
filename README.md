@@ -4,7 +4,7 @@
     width="260px" border="0" alt="patchitup">
 <br>
 <a href="https://github.com/schollz/patchitup/releases/latest"><img src="https://img.shields.io/badge/version-0.1.0-brightgreen.svg?style=flat-square" alt="Version"></a>
-<img src="https://img.shields.io/badge/coverage-92%25-green.svg?style=flat-square" alt="Code Coverage">
+<img src="https://img.shields.io/badge/coverage-75%25-green.svg?style=flat-square" alt="Code Coverage">
 <a href="https://godoc.org/github.com/schollz/patchitup/patchitup"><img src="https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square" alt="Code Coverage"></a>
 <a href="https://www.paypal.me/ZackScholl/5.00"><img src="https://img.shields.io/badge/donate-$5-brown.svg?style=flat-square" alt="Donate"></a>
 </p>
