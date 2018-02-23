@@ -50,6 +50,8 @@ The first time you patch will basically just send up the gzipped file. Subsequen
 
 # How does it work?
 
+_Note:_ *patchitup* does **not** work for binary files (yet).
+
 Why not just do "`diff -u old new > patch && rsync patch your@server:`"? Well, *patchitup* keeps things organized a lot better and uses `gzip` by default to reduce the bandwidth cost even further. Also, in order to patch a remote file you first need a copy of the remote file to create the patch. In *patchitup*, if the local copy of remote file is not available, a local copy of the remote file is reconstructed it in a way that can massively reduce bandwidth (i.e. instead of just downloading the remote file). To reconstruct a local copy of remote file:
 
 1. The client asks the remote server for a hash of every line and its corresponding line number in the remote file. 
