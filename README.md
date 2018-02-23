@@ -29,6 +29,10 @@ $ go install -v github.com/schollz/patchitup/...
 $ patchitup -host
 ```
 
+# How does it work?
+
+![](https://user-images.githubusercontent.com/6550035/36574282-e0335014-17f9-11e8-92ba-1a474deaae76.png)
+
 # License
 
 MIT
