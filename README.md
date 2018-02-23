@@ -81,4 +81,4 @@ MIT
 
 # Thanks
 
-Logo provided by designed by <a rel="nofollow" target="_blank" href="https://www.vecteezy.com">www.Vecteezy.com</a>
+Logo designed by <a rel="nofollow" target="_blank" href="https://www.vecteezy.com">www.Vecteezy.com</a>
