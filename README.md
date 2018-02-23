@@ -15,6 +15,7 @@
 
 <em><strong>Why?</strong></em> I wrote this program to reduce the bandwidth usage when backing up SQLite databases to a remote server. I have deployed some software that periodically [dumps the database to SQL text](http://www.sqlitetutorial.net/sqlite-dump/). As the databases can get fairly large, a patch from SQL text will only ever be the changed/new records. *patchitup* allows the client to just send to the cloud only the changed/new records and still maintain the exact copy on the cloud.  This can massively reduce bandwidth between the client and the cloud.
 
+<em><strong>Why not git?</strong></em> While *git* basically  does this already, its not terribly easy to setup a *git* server to support multiple users (though [gitolite](https://github.com/sitaramc/gitolite) does a great job of simplifying the process).  Also, most of the features of *git* are not necessary for my use-case.
 
 # Quickstart
 
