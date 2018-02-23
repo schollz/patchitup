@@ -1,6 +1,6 @@
 <p align="center">
 <img
-    src=""
+    src="https://raw.githubusercontent.com/schollz/patchitup/master/.github/logo.png?token=AGPyE539EM60WRIJo3VVDBASqzozHprrks5amLWtwA%3D%3D"
     width="260px" border="0" alt="patchitup">
 <br>
 <a href="https://travis-ci.org/schollz/patchitup"><img src="https://travis-ci.org/schollz/patchitup.svg?branch=master" alt="Build Status"></a>
@@ -36,3 +36,7 @@ $ patchitup -host
 # License
 
 MIT
+
+# Thanks
+
+Logo provided by designed by <a rel="nofollow" target="_blank" href="https://www.vecteezy.com">www.Vecteezy.com</a>
