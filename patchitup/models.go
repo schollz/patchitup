@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 
+	log "github.com/cihub/seelog"
 	"github.com/pkg/errors"
 )
 
@@ -26,6 +27,7 @@ type serverResponse struct {
 }
 
 var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)
+var convertWindowsLineFeed2 = regexp.MustCompile(`\r`)
 
 func getFileText(pathToFile string) (fileText string, err error) {
 	bFile, err := ioutil.ReadFile(pathToFile)
@@ -37,6 +39,7 @@ func getFileText(pathToFile string) (fileText string, err error) {
 		return
 	}
 	bFile = convertWindowsLineFeed.ReplaceAll(bFile, []byte("\n"))
+	bFile = convertWindowsLineFeed2.ReplaceAll(bFile, []byte(""))
 	fileText = string(bFile)
 	return
 }
@@ -58,7 +61,9 @@ func getHashLineNumbers(pathToFile string) (lines map[string][]int, err error) {
 	scanner := bufio.NewScanner(fz)
 	lineNumber := 0
 	for scanner.Scan() {
-		h := HashSHA256(convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n")))
+		line := convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n"))
+		h := HashSHA256(line)
+		log.Debug(line, h)
 		if _, ok := lines[h]; !ok {
 			lines[h] = []int{}
 		}
@@ -78,9 +83,7 @@ func getHashLines(pathToFile string) (lines map[string][]byte, err error) {
 
 	fz, err := gzip.NewReader(file)
 	scanner := bufio.NewScanner(fz)
-	lineNumber := 0
 	for scanner.Scan() {
-		lineNumber++
 		line := convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n"))
 		h := HashSHA256(line)
 		lines[h] = line

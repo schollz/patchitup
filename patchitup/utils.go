@@ -157,6 +157,19 @@ func RandStringBytesMaskImprSrc(n int) string {
 	return string(b)
 }
 
+func GzipFile(filename string) (err error) {
+	copiedBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return
+	}
+	compressedBytes, err := GzipBytes(convertWindowsLineFeed.ReplaceAll(copiedBytes, []byte("\n")))
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(filename+".gz", compressedBytes, 0755)
+	return
+}
+
 func GunzipBytes(compressed []byte) (uncompressed []byte, err error) {
 	if len(compressed) == 0 {
 		uncompressed = compressed

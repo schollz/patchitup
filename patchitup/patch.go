@@ -48,6 +48,7 @@ func patchFile(pathToFile string, compressedPatch string) (err error) {
 		return
 	}
 	newText, _ := dmp.PatchApply(patches, textBase)
+
 	compressedText, err := GzipBytes([]byte(newText))
 	if err != nil {
 		return

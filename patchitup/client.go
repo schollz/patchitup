@@ -103,7 +103,9 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	}
 	pathToRemoteCopy := path.Join(pathToCacheClient, username, filename)
 
-	// copy current state of file
+	// copy current state of file to gzipped temporary file
+	b, _ := ioutil.ReadFile(pathToFile)
+	log.Debug(b)
 	err = CopyFile(pathToFile, filename+".temp")
 	if err != nil {
 		return
@@ -112,6 +114,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	if err != nil {
 		return
 	}
+	copiedBytes = convertWindowsLineFeed.ReplaceAll(copiedBytes, []byte("\n"))
 	compressedBytes, err := GzipBytes(copiedBytes)
 	if err != nil {
 		return

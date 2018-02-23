@@ -28,7 +28,9 @@ func TestPatchUp(t *testing.T) {
 	err = PatchUp("http://localhost:8002", "testuser", "../test1")
 	assert.Nil(t, err)
 	// check that it copied correctly
-	originalHash, err := Filemd5Sum("../test1")
+	err = GzipFile("../test1")
+	assert.Nil(t, err)
+	originalHash, err := Filemd5Sum("../test1.gz")
 	assert.Nil(t, err)
 	serverHash, err := Filemd5Sum(path.Join(UserHomeDir(), ".patchitup", "server", "testuser", "test1"))
 	assert.Nil(t, err)
@@ -41,13 +43,16 @@ func TestPatchUp(t *testing.T) {
 	assert.Nil(t, err)
 	// change the test file
 	os.Remove("../test1")
-	err = CopyFile("server.go", "../test1")
+	os.Remove("../test1.gz")
+	err = CopyFile("globals.go", "../test1")
+	assert.Nil(t, err)
+	err = GzipFile("../test1")
 	assert.Nil(t, err)
 
 	err = PatchUp("http://localhost:8002", "testuser", "../test1")
 	assert.Nil(t, err)
 	// check that it copied correctly
-	originalHash, err = Filemd5Sum("../test1")
+	originalHash, err = Filemd5Sum("../test1.gz")
 	assert.Nil(t, err)
 	serverHash, err = Filemd5Sum(path.Join(UserHomeDir(), ".patchitup", "server", "testuser", "test1"))
 	assert.Nil(t, err)
