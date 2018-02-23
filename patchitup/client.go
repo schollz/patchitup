@@ -17,12 +17,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ClientConfiguration struct {
+type clientConfiguration struct {
 	ServerAddress string
 	Username      string
 }
 
-func handleConfiguration(address, username string) (c ClientConfiguration, err error) {
+func handleConfiguration(address, username string) (c clientConfiguration, err error) {
 	configFile := path.Join(UserHomeDir(), ".patchitup", "client", "config.toml")
 	bConfig, err := ioutil.ReadFile(configFile)
 	newConfig := false
@@ -34,7 +34,7 @@ func handleConfiguration(address, username string) (c ClientConfiguration, err e
 		}
 	} else {
 		newConfig = true
-		c = ClientConfiguration{}
+		c = clientConfiguration{}
 	}
 	// supplied names always override
 	if username != "" {
@@ -71,7 +71,7 @@ func handleConfiguration(address, username string) (c ClientConfiguration, err e
 	return
 }
 
-// PatchUp will take a filename and upload it to the server via a patch.
+// PatchUp will take a filename and upload it to the server via a patch using the specified user.
 func PatchUp(address, username, pathToFile string) (err error) {
 	// make the directory for the client
 	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "client"), 0755)

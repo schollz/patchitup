@@ -11,7 +11,7 @@
 
 <p align="center">Backup your file to a cloud server using minimum bandwidth.</p>
 
-*patchitup* is a way to keep the cloud up-to-date through incremental patches. In a nutshell, this is a Golang library and a CLI tool for creating a client+server that exchange incremental gzipped patches to overwrite a remote copy to keep it up-to-date to with client's local file. 
+*patchitup* is a way to keep the cloud up-to-date through incremental patches. In a nutshell, this is a pure-Golang library and a CLI tool for creating a client+server that exchange incremental gzipped patches to overwrite a remote copy to keep it up-to-date with the client's local file. 
 
 <em><strong>Why?</strong></em> I wrote this program to reduce the bandwidth usage when backing up SQLite databases to a remote server. I have deployed some software that periodically [dumps the database to SQL text](http://www.sqlitetutorial.net/sqlite-dump/). As the databases can get fairly large, a patch from SQL text will only ever be the changed/new records. *patchitup* allows the client to just send to the cloud only the changed/new records and still maintain the exact copy on the cloud.  This can massively reduce bandwidth between the client and the cloud.
 
@@ -45,7 +45,7 @@ $ patchitup -u me -s http://localhost:8002 -f SOMEFILE
 2018-02-23 08:57:40 [INFO] remote server is up-to-date
 ```
 
-The first time you patch will basically just send up the gzipped file. Subsequent edits will just send up the patches. The percentage (e.g. `9.9%`) specifies the percentage of the entire file size that is being sent (to get an idea of bandwidth savings).
+The first time you patch will basically just send up the gzipped file. Subsequent edits will just send up the patches. The percentage (e.g. `9.9%`) specifies the percentage of the entire file size that is being sent (to get an idea of bandwidth savings). The server also will log bandwidth usage.
 
 
 # How does it work?
@@ -63,6 +63,15 @@ A more detailed flow chart:
 <center>
 	<img src="https://user-images.githubusercontent.com/6550035/36574282-e0335014-17f9-11e8-92ba-1a474deaae76.png">
 </center>
+
+# Roadmap
+
+I would love PRs.
+
+Some ideas I'd like to add:
+
+- [ ] Built-in security (authentication tokens?)
+- [ ] Encryption option (to keep data on server private)
 
 # License
 
