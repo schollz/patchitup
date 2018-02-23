@@ -48,7 +48,7 @@ func handleConfiguration(address, username string) (c ClientConfiguration, err e
 	if c.Username == "" {
 		// supply a random username
 		c.Username = RandStringBytesMaskImprSrc(10)
-		fmt.Printf("your username is '%s'\n", c.Username)
+		log.Infof("your username is '%s'\n", c.Username)
 	}
 	if c.ServerAddress == "" {
 		err = errors.New("must supply address (-s)")
@@ -66,7 +66,7 @@ func handleConfiguration(address, username string) (c ClientConfiguration, err e
 		return
 	}
 	if newConfig {
-		fmt.Println("configuration file written, next time you do not need to include username (-u) and server (-s)")
+		log.Info("configuration file written, next time you do not need to include username (-u) and server (-s)")
 	}
 	return
 }
@@ -122,6 +122,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	log.Debugf("local hash: %s", localHash)
 	log.Debugf("remote hash: %s", remoteHash)
 	if localHash == remoteHash {
+		log.Info("remote server is up-to-date")
 		return
 	}
 
@@ -158,7 +159,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	if err != nil {
 		return err
 	} else {
-		fmt.Printf("patched %s (%2.1f%%) to remote '%s' for '%s'\n", humanize.Bytes(uint64(len(patch))), 100*float64(len(patch))/float64(len(localText)), filename, username)
+		log.Infof("patched %s (%2.1f%%) to remote '%s' for '%s'\n", humanize.Bytes(uint64(len(patch))), 100*float64(len(patch))/float64(len(localText)), filename, username)
 	}
 
 	// update the local remote copy
@@ -167,7 +168,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 		return err
 	}
 
-	fmt.Println("remote server is up-to-date")
+	log.Info("remote server is up-to-date")
 	return
 }
 
