@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 
@@ -36,18 +35,7 @@ func main() {
 		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
 	} else {
-		if pathToFile == "" {
-			err = errors.New("file cannot be empty")
-		} else if address == "" {
-			err = errors.New("address cannot be empty")
-		} else if username == "" {
-			err = errors.New("username cannot be empty")
-		} else {
-			err = patchitup.PatchUp(address, username, pathToFile)
-		}
-		if err == nil {
-			fmt.Println("remote server is up to date")
-		}
+		err = patchitup.PatchUp(address, username, pathToFile)
 	}
 	if err != nil {
 		fmt.Println(err)

@@ -11,10 +11,65 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
+
+type ClientConfiguration struct {
+	ServerAddress string
+	Username      string
+}
+
+func handleConfiguration(address, username string) (c ClientConfiguration, err error) {
+	configFile := path.Join(UserHomeDir(), ".patchitup", "client", "config.toml")
+	bConfig, err := ioutil.ReadFile(configFile)
+	newConfig := false
+	if err == nil {
+		err2 := toml.Unmarshal(bConfig, &c)
+		if err2 != nil {
+			err = err2
+			return
+		}
+	} else {
+		newConfig = true
+		c = ClientConfiguration{}
+	}
+	// supplied names always override
+	if username != "" {
+		c.Username = username
+	}
+	if address != "" {
+		c.ServerAddress = address
+	}
+
+	// check that they are not empty
+	if c.Username == "" {
+		// supply a random username
+		c.Username = RandStringBytesMaskImprSrc(10)
+		fmt.Printf("your username is '%s'\n", c.Username)
+	}
+	if c.ServerAddress == "" {
+		err = errors.New("must supply address (-s)")
+		return
+	}
+
+	// save the configuration
+	buf := new(bytes.Buffer)
+	err = toml.NewEncoder(buf).Encode(c)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(configFile, buf.Bytes(), 0755)
+	if err != nil {
+		return
+	}
+	if newConfig {
+		fmt.Println("configuration file written, next time you do not need to include username (-u) and server (-s)")
+	}
+	return
+}
 
 // PatchUp will take a filename and upload it to the server via a patch.
 func PatchUp(address, username, pathToFile string) (err error) {
@@ -23,6 +78,16 @@ func PatchUp(address, username, pathToFile string) (err error) {
 
 	// flush logs so that they show up
 	defer log.Flush()
+
+	// first try to load the configuration file
+	c, err := handleConfiguration(address, username)
+	if err != nil {
+		return
+	}
+	address = c.ServerAddress
+	username = c.Username
+
+	// generate the filename
 	_, filename := filepath.Split(pathToFile)
 
 	// first make sure the file to upload exists
@@ -102,6 +167,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 		return err
 	}
 
+	fmt.Println("remote server is up-to-date")
 	return
 }
 
