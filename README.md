@@ -11,7 +11,7 @@
 
 <p align="center">Backup your file to a cloud server using minimum bandwidth.</p>
 
-*patchitup* is a way to keep the cloud up-to-date through incremental patches. In a nutshell, this is a Golang library and a CLI tool for creating a client+server that exchange incremental gzipped patches to overwrite a remote copy to keep it up-to-date to the client's local file. 
+*patchitup* is a way to keep the cloud up-to-date through incremental patches. In a nutshell, this is a Golang library and a CLI tool for creating a client+server that exchange incremental gzipped patches to overwrite a remote copy to keep it up-to-date to with client's local file. 
 
 <em><strong>Why?</strong></em> I wrote this program to reduce the bandwidth usage when backing up SQLite databases to a remote server. I have deployed some software that periodically [dumps the database to SQL text](http://www.sqlitetutorial.net/sqlite-dump/). As the databases can get fairly large, a patch from SQL text will only ever be the changed/new records. *patchitup* allows the client to just send to the cloud only the changed/new records and still maintain the exact copy on the cloud.  This can massively reduce bandwidth between the client and the cloud.
 
@@ -49,9 +49,17 @@ Then you can patch a file:
 
 ```
 $ patchitup -u me -s http://localhost:8002 -f SOMEFILE
-2018-02-23 08:45:07 [INFO] patched 1.2 kB (4.7%) to remote 'SOMEFILE' for 'me'
-2018-02-23 08:45:07 [INFO] remote server is up-to-date
+2018-02-23 08:56:44 [INFO] patched 2.4 kB (62.8%) to remote 'SOMEFILE' for 'me'
+2018-02-23 08:56:44 [INFO] remote server is up-to-date
+
+$ vim SOMEFILE # make some edits
+
+$ patchitup -u me -s http://localhost:8002 -f SOMEFILE
+2018-02-23 08:57:40 [INFO] patched 408 B (9.9%) to remote 'SOMEFILE' for 'me'
+2018-02-23 08:57:40 [INFO] remote server is up-to-date
 ```
+
+The first time you patch will basically just send up the gzipped file. Subsequent edits will just send up the patches. The percentage (e.g. `9.9%`) specifies the percentage of the entire file size that is being sent (to get an idea of bandwidth savings).
 
 # License
 
