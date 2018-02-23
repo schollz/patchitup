@@ -93,7 +93,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	if err != nil {
 		return err
 	} else {
-		fmt.Printf("patched %s to remote '%s' for '%s'\n", humanize.Bytes(uint64(len(patch))), filename, username)
+		fmt.Printf("patched %s (%2.1f%%) to remote '%s' for '%s'\n", humanize.Bytes(uint64(len(patch))), 100*float64(len(patch))/float64(len(localText)), filename, username)
 	}
 
 	// update the local remote copy
