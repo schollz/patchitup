@@ -3,10 +3,10 @@
     src="https://raw.githubusercontent.com/schollz/patchitup/master/.github/logo.png?token=AGPyE539EM60WRIJo3VVDBASqzozHprrks5amLWtwA%3D%3D"
     width="260px" border="0" alt="patchitup">
 <br>
-<a href="https://travis-ci.org/schollz/patchitup"><img src="https://travis-ci.org/schollz/patchitup.svg?branch=master" alt="Build Status"></a>
-<a href="https://github.com/schollz/patchitup/releases/latest"><img src="https://img.shields.io/badge/version-0.1.0-brightgreen.svg?style=flat-square" alt="Version"></a>
-<a href="https://goreportcard.com/report/github.com/schollz/patchitup"><img src="https://goreportcard.com/badge/github.com/schollz/patchitup" alt="Go Report Card"></a>
-<a href="https://www.paypal.me/ZackScholl/5.00"><img src="https://img.shields.io/badge/donate-$5-brown.svg" alt="Donate"></a>
+<a href="https://github.com/schollz/patchitup/releases/latest"><img src="https://img.shields.io/badge/version-1.1.3-brightgreen.svg?style=flat-square" alt="Version"></a>
+<img src="https://img.shields.io/badge/coverage-92%25-green.svg?style=flat-square" alt="Code Coverage">
+<a href="https://godoc.org/github.com/schollz/patchitup/patchitup"><img src="https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square" alt="Code Coverage"></a>
+<a href="https://www.paypal.me/ZackScholl/5.00"><img src="https://img.shields.io/badge/donate-$5-brown.svg?style=flat-square" alt="Donate"></a>
 </p>
 
 <p align="center">Backup your file to a cloud server using minimum bandwidth.</p>
