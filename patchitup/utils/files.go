@@ -1,41 +1,11 @@
-package patchitup
+package utils
 
 import (
-	"bufio"
-	"crypto/md5"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"io"
-	math_rand "math/rand"
 	"os"
 	"runtime"
-	"time"
 )
-
-// Filemd5Sum returns the md5 sum of a file
-func Filemd5Sum(pathToFile string) (result string, err error) {
-	file, err := os.Open(pathToFile)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	hash := md5.New()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := convertWindowsLineFeed.ReplaceAll(scanner.Bytes(), []byte("\n"))
-		hash.Write(line)
-	}
-	result = hex.EncodeToString(hash.Sum(nil))
-	return
-}
-
-func HashSHA256(s []byte) string {
-	h := sha256.New()
-	h.Write(s)
-	return string(base64.StdEncoding.EncodeToString(h.Sum(nil)))[:8]
-}
 
 // UserHomeDir returns the user home directory
 // taken from go1.8c2
@@ -64,8 +34,7 @@ func Exists(path string) bool {
 }
 
 // CopyFile copies a file from src to dst. If src and dst files exist, and are
-// the same, then return success. Otherise, ~~attempt to create a hard link
-// between the two files. If that fail,~~ copy the file contents from src to dst.
+// the same, then return success. Copy the file contents from src to dst.
 // from http://stackoverflow.com/questions/21060945/simple-way-to-copy-a-file-in-golang
 func CopyFile(src, dst string) (err error) {
 	sfi, err := os.Stat(src)
@@ -123,33 +92,4 @@ func copyFileContents(src, dst string) (err error) {
 	}
 	err = out.Sync()
 	return
-}
-
-// src is seeds the random generator for generating random strings
-var src = math_rand.NewSource(time.Now().UnixNano())
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
-
-// RandStringBytesMaskImprSrc prints a random string
-func RandStringBytesMaskImprSrc(n int) string {
-	b := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
-		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
-		}
-		cache >>= letterIdxBits
-		remain--
-	}
-
-	return string(b)
 }
