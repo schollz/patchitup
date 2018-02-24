@@ -6,18 +6,14 @@ import (
 )
 
 type serverRequest struct {
-	Username     string              `json:"username" binding:"required"`
-	Filename     string              `json:"filename" binding:"required"`
-	Data         string              `json:"data"`
-	MissingLines map[string]struct{} `json:"missing_lines"`
-	Patch        string              `json:"patch"`
+	Username string `json:"username" binding:"required"`
+	Filename string `json:"filename" binding:"required"`
+	Patch    string `json:"patch"`
 }
 
 type serverResponse struct {
-	Message         string            `json:"message"`
-	Success         bool              `json:"success"`
-	HashLinenumbers map[string][]int  `json:"hash_linenumbers"`
-	HashLineText    map[string][]byte `json:"hash_linetext"`
+	Message string `json:"message"`
+	Success bool   `json:"success"`
 }
 
 var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)

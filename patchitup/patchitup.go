@@ -28,12 +28,9 @@ type Patchitup struct {
 	hashLocal     string
 }
 
-func New(address, username string, server ...bool) (p *Patchitup) {
+func New(address, username string) (p *Patchitup) {
 	p = new(Patchitup)
-	p.cacheFolder = path.Join(utils.UserHomeDir(), ".patchitup", "client", username)
-	if len(server) > 0 && server[0] {
-		p.cacheFolder = path.Join(utils.UserHomeDir(), ".patchitup", "server", username)
-	}
+	p.cacheFolder = path.Join(utils.UserHomeDir(), ".patchitup", username)
 	os.MkdirAll(p.cacheFolder, 0755)
 	p.username = username
 	p.serverAddress = address
@@ -46,7 +43,7 @@ type patchFile struct {
 	Timestamp int
 }
 
-func (p *Patchitup) Rebuild(pathToFile string) (err error) {
+func (p *Patchitup) Rebuild(pathToFile string) (latest string, err error) {
 	// flush logs so that they show up
 	defer log.Flush()
 
@@ -59,13 +56,10 @@ func (p *Patchitup) Rebuild(pathToFile string) (err error) {
 	if err != nil {
 		return
 	}
-	log.Debugf("patches: %+v", patches)
-
-	currentText := ""
+	latest = ""
 	for _, patch := range patches {
 		var patchBytes []byte
 		var patchString string
-		log.Debugf("adding %s from %d", patch.Hash, patch.Timestamp)
 		patchBytes, err = ioutil.ReadFile(patch.Filename)
 		if err != nil {
 			return
@@ -74,16 +68,15 @@ func (p *Patchitup) Rebuild(pathToFile string) (err error) {
 		if err != nil {
 			return
 		}
-		currentText, err = patchText(currentText, patchString)
+		latest, err = patchText(latest, patchString)
 		if err != nil {
 			return
 		}
-		log.Debug([]byte(currentText))
-		log.Debugf("rebuilt hash: %s", utils.Md5Sum(currentText))
-		log.Debugf("supposed hash: %s", patch.Hash)
+		if utils.Md5Sum(latest) != patch.Hash {
+			log.Warnf("rebuilt(%s) != supposed(%s)", utils.Md5Sum(latest), patch.Hash)
+			err = errors.New("hashes do not match")
+		}
 	}
-	b, _ := ioutil.ReadFile("test.txt")
-	log.Debug(b)
 	return
 }
 
@@ -111,6 +104,9 @@ func (p *Patchitup) getPatches() (patchFiles []patchFile, err error) {
 		}
 		pf.Hash = g[len(g)-2]
 		m[pf.Timestamp] = pf
+	}
+	if len(m) == 0 {
+		return
 	}
 
 	keys := make([]int, len(m))
@@ -142,14 +138,14 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	}
 
 	// copy current state of file
-	err = utils.CopyFile(pathToFile, pathToFile+".temp")
+	err = utils.CopyFile(pathToFile, pathToFile+".current")
 	if err != nil {
 		return
 	}
-	pathToFile = pathToFile + ".temp"
+	defer os.Remove(pathToFile + ".current")
 
 	// get current text
-	localText, err := getFileText(pathToFile)
+	localText, err := getFileText(pathToFile + ".current")
 	if err != nil {
 		return
 	}
@@ -162,26 +158,16 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	}
 
 	// get current hash of the remote file and compare
-	// TODO: return if they are the same
-
-	// get info from the last version uploaded
-	pathToLocalCopyOfRemote := path.Join(p.cacheFolder, p.filename+".last")
-	localCopyOfRemoteText := ""
-	hashLocalCopyOfRemote := ""
-	if utils.Exists(pathToLocalCopyOfRemote) {
-		hashLocalCopyOfRemote, err = utils.Filemd5Sum(pathToLocalCopyOfRemote)
-		if err != nil {
-			return
-		}
-		localCopyOfRemoteText, err = getFileText(pathToLocalCopyOfRemote)
-		if err != nil {
-			return
-		}
+	localCopyOfRemoteText, err := p.Rebuild(pathToFile)
+	if err != nil {
+		return
 	}
+	hashLocalCopyOfRemote := utils.Md5Sum(localCopyOfRemoteText)
 
-	// make sure that the hash of the local copy of the remote is the same as the one on the server
-	log.Debugf("hashLocalCopyOfRemote: %s", hashLocalCopyOfRemote)
-	// TODO: pull from the server if they differ
+	if hashLocalCopyOfRemote == p.hashLocal {
+		log.Debug("hashes match, not doing anything")
+		return
+	}
 
 	// upload patches
 	patch := getPatch(localCopyOfRemoteText, localText)
@@ -195,9 +181,6 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 			p.filename,
 			p.username)
 	}
-
-	// update the local remote copy
-	err = utils.CopyFile(pathToFile, path.Join(p.cacheFolder, p.filename+".last"))
 
 	log.Info("remote server is up-to-date")
 	return
@@ -252,11 +235,16 @@ func (p *Patchitup) uploadPatches(patch string) (err error) {
 		p.hashLocal,
 		time.Now().UTC().UnixNano()/int64(time.Millisecond),
 	)
+	err = ioutil.WriteFile(path.Join(p.cacheFolder, filename), []byte(patch), 0755)
+	if err != nil {
+		return
+	}
 	sr := serverRequest{
 		Username: p.username,
 		Filename: filename,
 		Patch:    patch,
 	}
 	_, err = postToServer(p.serverAddress+"/patch", sr)
+
 	return
 }

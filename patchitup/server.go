@@ -18,8 +18,6 @@ import (
 
 // Run will run the main program
 func Run(port string) (err error) {
-	os.MkdirAll(path.Join(utils.UserHomeDir(), ".patchitup", "server"), 0755)
-
 	defer log.Flush()
 	// setup gin server
 	gin.SetMode(gin.ReleaseMode)
@@ -45,22 +43,18 @@ func handlerFileHash(c *gin.Context) {
 		log.Infof("%s/%s upload: %s", sr.Username, sr.Filename, humanize.Bytes(uint64(c.Request.ContentLength)))
 
 		// create cache directory
-		if !utils.Exists(path.Join(pathToCacheServer, sr.Username)) {
-			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
-		}
-		pathToFile := path.Join(pathToCacheServer, sr.Username, sr.Filename)
-		if !utils.Exists(pathToFile) {
-			message = "created new file"
-			newFile, err2 := os.Create(pathToFile)
-			if err2 != nil {
-				err = errors.Wrap(err2, "problem creating file")
-				return
-			}
-			newFile.Close()
-			return
+		pathToCacheServer := path.Join(utils.UserHomeDir(), ".patchitup", sr.Username)
+		if !utils.Exists(pathToCacheServer) {
+			os.MkdirAll(pathToCacheServer, 0755)
 		}
 
-		message, err = utils.Filemd5Sum(pathToFile)
+		pathToFile := path.Join(pathToCacheServer, sr.Filename)
+		p := New("", sr.Username)
+		latest, err := p.Rebuild(pathToFile)
+		if err != nil {
+			return
+		}
+		message = utils.Md5Sum(latest)
 		return
 	}(c)
 	if err != nil {
@@ -90,12 +84,12 @@ func handlerPatch(c *gin.Context) {
 		log.Infof("%s/%s upload: %s", sr.Username, sr.Filename, humanize.Bytes(uint64(c.Request.ContentLength)))
 
 		// create cache directory
-		if !utils.Exists(path.Join(pathToCacheServer, sr.Username)) {
-			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
+		pathToCacheServer := path.Join(utils.UserHomeDir(), ".patchitup", sr.Username)
+		if !utils.Exists(pathToCacheServer) {
+			os.MkdirAll(pathToCacheServer, 0755)
 		}
-		pathToFile := path.Join(pathToCacheServer, sr.Username, sr.Filename)
+		pathToFile := path.Join(pathToCacheServer, sr.Filename)
 		err = ioutil.WriteFile(pathToFile, []byte(sr.Patch), 0755)
-
 		if err == nil {
 			message = "applied patch"
 		}
