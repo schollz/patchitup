@@ -13,7 +13,7 @@ func getPatch(text1, text2 string) string {
 
 func patchText(textBase string, patchText string) (newText string, err error) {
 	dmp := diffmatchpatch.New()
-	patches, err := dmp.PatchFromText(patch)
+	patches, err := dmp.PatchFromText(patchText)
 	if err != nil {
 		return
 	}

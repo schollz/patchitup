@@ -35,7 +35,8 @@ func main() {
 		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
 	} else {
-		err = patchitup.PatchUp(address, username, pathToFile)
+		p := patchitup.New(address, username)
+		p.PatchUp(pathToFile)
 	}
 	if err != nil {
 		fmt.Println(err)

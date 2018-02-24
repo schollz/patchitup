@@ -2,6 +2,7 @@ package patchitup
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -93,18 +94,8 @@ func handlerPatch(c *gin.Context) {
 			os.MkdirAll(path.Join(pathToCacheServer, sr.Username), 0755)
 		}
 		pathToFile := path.Join(pathToCacheServer, sr.Username, sr.Filename)
-		if !utils.Exists(pathToFile) {
-			message = "created new file"
-			newFile, err2 := os.Create(pathToFile)
-			if err2 != nil {
-				err = errors.Wrap(err2, "problem creating file")
-				return
-			}
-			newFile.Close()
-			return
-		}
+		err = ioutil.WriteFile(pathToFile, []byte(sr.Patch), 0755)
 
-		err = patchFile(pathToFile, sr.Patch)
 		if err == nil {
 			message = "applied patch"
 		}

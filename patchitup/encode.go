@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 
+	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/schollz/utils"
 )
