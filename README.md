@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">Backup your file to a cloud server using minimum bandwidth.</p>
-
+jkj
 *patchitup* is a way to keep the cloud up-to-date through incremental patches. In a nutshell, this is a pure-Golang library and a CLI tool for creating a client+server that exchange incremental gzipped patches to overwrite a remote copy to keep it up-to-date with the client's local file. 
 
 <em><strong>Why?</strong></em> I wrote this program to reduce the bandwidth usage when backing up SQLite databases to a remote server from Raspberry Pis. I have deployed some software on Raspberry Pis that periodically [dumps the database to SQL text](http://www.sqlitetutorial.net/sqlite-dump/). Since Raspberry Pi's can die sometimes, I want to keep their data stored remotely. As the databases can get fairly large, a patch from SQL text will only ever be the changed/new records. *patchitup* allows the client to just send to the cloud only the changed/new records and still maintain the exact copy on the cloud. This can massively reduce bandwidth between the client and the cloud. 

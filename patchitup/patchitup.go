@@ -187,7 +187,7 @@ func (p *Patchitup) uploadPatches(patch string) (err error) {
 	filename := fmt.Sprintf("%s.%s.%d",
 		p.filename,
 		p.hashLocal,
-		time.Now().UnixNano()/int64(time.Millisecond),
+		time.Now().UTC().UnixNano()/int64(time.Millisecond),
 	)
 	sr := serverRequest{
 		Username: p.username,
