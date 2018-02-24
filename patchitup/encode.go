@@ -1,5 +1,14 @@
-packate patchitup 
+package patchitup
 
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"io/ioutil"
+
+	humanize "github.com/dustin/go-humanize"
+	"github.com/schollz/utils"
+)
 
 func encode(s string) (encoded string) {
 	// compress patch
