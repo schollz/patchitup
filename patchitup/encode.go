@@ -8,6 +8,7 @@ import (
 
 	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
+	"github.com/pkg/errors"
 	"github.com/schollz/utils"
 )
 
@@ -39,6 +40,7 @@ func decode(s string) (decoded string, err error) {
 	// convert from base64
 	patchBytes, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
+		err = errors.Wrap(err, "problem converting from base64")
 		return
 	}
 

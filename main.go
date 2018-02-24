@@ -12,6 +12,7 @@ func main() {
 		doDebug    bool
 		port       string
 		server     bool
+		rebuild    bool
 		pathToFile string
 		username   string
 		address    string
@@ -23,6 +24,7 @@ func main() {
 	flag.StringVar(&address, "s", "", "server name")
 	flag.BoolVar(&doDebug, "debug", false, "enable debugging")
 	flag.BoolVar(&server, "host", false, "enable hosting")
+	flag.BoolVar(&rebuild, "rebuild", false, "rebuild file")
 	flag.Parse()
 
 	if doDebug {
@@ -34,9 +36,12 @@ func main() {
 	if server {
 		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
+	} else if rebuild {
+		p := patchitup.New(address, username, true)
+		err = p.Rebuild(pathToFile)
 	} else {
 		p := patchitup.New(address, username)
-		p.PatchUp(pathToFile)
+		err = p.PatchUp(pathToFile)
 	}
 	if err != nil {
 		fmt.Println(err)

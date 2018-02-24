@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -39,29 +40,90 @@ func New(address, username string, server ...bool) (p *Patchitup) {
 	return p
 }
 
-// getLatestRemote will determine the hash of the latest file
-func (p *Patchitup) getLatestCache() (pathToNewest string, hashOfNewest string, err error) {
+type patchFile struct {
+	Filename  string
+	Hash      string
+	Timestamp int
+}
+
+func (p *Patchitup) Rebuild(pathToFile string) (err error) {
+	// flush logs so that they show up
+	defer log.Flush()
+
+	log.Debug("rebuilding")
+
+	// generate the filename
+	_, p.filename = filepath.Split(pathToFile)
+
+	patches, err := p.getPatches()
+	if err != nil {
+		return
+	}
+	log.Debugf("patches: %+v", patches)
+
+	currentText := ""
+	for _, patch := range patches {
+		var patchBytes []byte
+		var patchString string
+		log.Debugf("adding %s from %d", patch.Hash, patch.Timestamp)
+		patchBytes, err = ioutil.ReadFile(patch.Filename)
+		if err != nil {
+			return
+		}
+		patchString, err = decode(string(patchBytes))
+		if err != nil {
+			return
+		}
+		currentText, err = patchText(currentText, patchString)
+		if err != nil {
+			return
+		}
+		log.Debug([]byte(currentText))
+		log.Debugf("rebuilt hash: %s", utils.Md5Sum(currentText))
+		log.Debugf("supposed hash: %s", patch.Hash)
+	}
+	b, _ := ioutil.ReadFile("test.txt")
+	log.Debug(b)
+	return
+}
+
+// getPatches will determine the hash of the latest file
+func (p *Patchitup) getPatches() (patchFiles []patchFile, err error) {
 	files, err := ioutil.ReadDir(p.cacheFolder)
 	if err != nil {
 		return
 	}
 
-	oldest := 0
+	m := make(map[int]patchFile)
 	for _, f := range files {
-		g := strings.Split(f.Name(), ".")
-		if len(g) < 3 {
+		if !strings.HasPrefix(f.Name(), p.filename+".") {
 			continue
 		}
-		i, err2 := strconv.Atoi(g[len(g)-1])
+		g := strings.Split(f.Name(), ".")
+		if len(g) < 4 {
+			continue
+		}
+		var err2 error
+		pf := patchFile{Filename: path.Join(p.cacheFolder, f.Name())}
+		pf.Timestamp, err2 = strconv.Atoi(g[len(g)-1])
 		if err2 != nil {
-			err = err2
-			return
+			continue
 		}
-		if i > oldest {
-			hashOfNewest = g[len(g)-2]
-			pathToNewest = path.Join(p.cacheFolder, f.Name())
-			oldest = i
-		}
+		pf.Hash = g[len(g)-2]
+		m[pf.Timestamp] = pf
+	}
+
+	keys := make([]int, len(m))
+	i := 0
+	for key := range m {
+		keys[i] = key
+		i++
+	}
+	sort.Ints(keys)
+
+	patchFiles = make([]patchFile, len(keys))
+	for i, key := range keys {
+		patchFiles[i] = m[key]
 	}
 	return
 }
@@ -86,14 +148,15 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	}
 	pathToFile = pathToFile + ".temp"
 
-	// get current hash
-	p.hashLocal, err = utils.Filemd5Sum(pathToFile)
+	// get current text
+	localText, err := getFileText(pathToFile)
 	if err != nil {
 		return
 	}
+	localText = string(utils.Dos2Unix([]byte(localText)))
 
-	// get current text
-	localText, err := getFileText(pathToFile)
+	// get current hash
+	p.hashLocal = utils.Md5Sum(localText)
 	if err != nil {
 		return
 	}
@@ -122,7 +185,7 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 
 	// upload patches
 	patch := getPatch(localCopyOfRemoteText, localText)
-	err = p.uploadPatches(patch)
+	err = p.uploadPatches(encode(patch))
 	if err != nil {
 		return err
 	} else {
