@@ -9,12 +9,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
+	"github.com/schollz/utils"
 )
 
 type clientConfiguration struct {
@@ -23,7 +23,7 @@ type clientConfiguration struct {
 }
 
 func handleConfiguration(address, username string) (c clientConfiguration, err error) {
-	configFile := path.Join(UserHomeDir(), ".patchitup", "client", "config.toml")
+	configFile := path.Join(utils.UserHomeDir(), ".patchitup", "client", "config.toml")
 	bConfig, err := ioutil.ReadFile(configFile)
 	newConfig := false
 	if err == nil {
@@ -47,7 +47,7 @@ func handleConfiguration(address, username string) (c clientConfiguration, err e
 	// check that they are not empty
 	if c.Username == "" {
 		// supply a random username
-		c.Username = RandStringBytesMaskImprSrc(10)
+		c.Username = utils.RandStringBytesMaskImprSrc(10)
 		log.Infof("your username is '%s'\n", c.Username)
 	}
 	if c.ServerAddress == "" {
@@ -74,7 +74,7 @@ func handleConfiguration(address, username string) (c clientConfiguration, err e
 // PatchUp will take a filename and upload it to the server via a patch using the specified user.
 func PatchUp(address, username, pathToFile string) (err error) {
 	// make the directory for the client
-	os.MkdirAll(path.Join(UserHomeDir(), ".patchitup", "client"), 0755)
+	os.MkdirAll(path.Join(utils.UserHomeDir(), ".patchitup", "client"), 0755)
 
 	// flush logs so that they show up
 	defer log.Flush()
@@ -92,26 +92,26 @@ func PatchUp(address, username, pathToFile string) (err error) {
 
 	// first make sure the file to upload exists
 	log.Debugf("check if '%s' exists", pathToFile)
-	if !Exists(pathToFile) {
+	if !utils.Exists(pathToFile) {
 		return fmt.Errorf("'%s' not found", pathToFile)
 	}
 
 	// check if cache folder exists
-	if !Exists(path.Join(pathToCacheClient, username)) {
+	if !utils.Exists(path.Join(pathToCacheClient, username)) {
 		log.Debugf("making cache folder for user '%s'", username)
 		os.MkdirAll(path.Join(pathToCacheClient, username), 0755)
 	}
 	pathToRemoteCopy := path.Join(pathToCacheClient, username, filename)
 
 	// copy current state of file
-	err = CopyFile(pathToFile, filename+".temp")
+	err = utils.CopyFile(pathToFile, filename+".temp")
 	defer os.Remove(filename + ".temp")
 	if err != nil {
 		return
 	}
 
 	// get the latest hash from remote
-	localHash, err := Filemd5Sum(pathToFile)
+	localHash, err := utils.Filemd5Sum(pathToFile)
 	if err != nil {
 		return
 	}
@@ -127,20 +127,10 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	}
 
 	// check hash of the cached remote copy and the remote copy
-	localRemoteHash, err := Filemd5Sum(pathToRemoteCopy)
+	localRemoteHash, err := utils.Filemd5Sum(pathToRemoteCopy)
 	log.Debugf("local remote hash: %s", localRemoteHash)
 	if localRemoteHash != remoteHash {
-		// local remote copy and remote is out of data
-		// reconstruct file from remote
-		log.Debug("reconstructing from remote")
-		remoteCopyText, err := reconstructCopyFromRemote(address, username, filename)
-		if err != nil {
-			return errors.Wrap(err, "problem reconstructing: ")
-		}
-		err = ioutil.WriteFile(pathToRemoteCopy, []byte(remoteCopyText), 0755)
-	} else {
-		// local remote copy replicate of the remote file, so it can be used to generate diff
-		log.Debug("local remote is up-to-date, not reconstructing")
+		// TODO
 	}
 
 	// get patches between the local version and the local remote version
@@ -163,10 +153,7 @@ func PatchUp(address, username, pathToFile string) (err error) {
 	}
 
 	// update the local remote copy
-	err = ioutil.WriteFile(pathToRemoteCopy, convertWindowsLineFeed.ReplaceAll([]byte(localText), []byte("\n")), 0755)
-	if err != nil {
-		return err
-	}
+	// TODO COPY the temp file
 
 	log.Info("remote server is up-to-date")
 	return
@@ -211,7 +198,7 @@ func getLatestHash(address, username, pathToFile string) (fileHash string, err e
 		Username: username,
 		Filename: filename,
 	}
-	target, err := postToServer(address+"/fileHash", sr)
+	target, err := postToServer(address+"/hash", sr)
 	fileHash = target.Message
 	return
 }
@@ -226,109 +213,5 @@ func uploadPatches(patch string, address, username, pathToFile string) (err erro
 		Patch:    patch,
 	}
 	_, err = postToServer(address+"/patch", sr)
-	return
-}
-
-func getRemoteCopyHashLineNumbers(address, username, pathToFile string) (hashLineNumbers map[string][]int, err error) {
-	hashLineNumbers = make(map[string][]int)
-
-	_, filename := filepath.Split(pathToFile)
-
-	// ask for lines from server
-	sr := serverRequest{
-		Username: username,
-		Filename: filename,
-	}
-	target, err := postToServer(address+"/lineNumbers", sr)
-	hashLineNumbers = target.HashLinenumbers
-	return
-}
-
-func getRemoteCopyHashLines(remoteHashLineNumbers map[string][]int, address, username, pathToFile string) (hashLines map[string][]byte, err error) {
-	hashLines = make(map[string][]byte)
-
-	_, filename := filepath.Split(pathToFile)
-
-	pathToRemoteCopy := path.Join(pathToCacheClient, username, filename)
-	if !Exists(pathToRemoteCopy) {
-		newFile, err2 := os.Create(pathToRemoteCopy)
-		if err2 != nil {
-			err = errors.Wrap(err2, "problem creating file")
-			return
-		}
-		newFile.Close()
-		if len(remoteHashLineNumbers) == 0 {
-			return
-		}
-	}
-
-	log.Debug("reconstructing, creating local copy of remote")
-	file, err := os.Open(pathToRemoteCopy)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	log.Debug("determining which lines in current file are in the remote copy")
-	hashLines, err = getHashLines(filename + ".temp")
-	if err != nil {
-		return
-	}
-
-	missingLines := make(map[string]struct{})
-	for h := range remoteHashLineNumbers {
-		if _, ok := hashLines[h]; !ok {
-			missingLines[h] = struct{}{}
-		}
-	}
-
-	if len(missingLines) == 0 {
-		log.Debug("not missing any lines")
-		return
-	}
-
-	sr := serverRequest{
-		Username:     username,
-		Filename:     filename,
-		MissingLines: missingLines,
-	}
-	target, err := postToServer(address+"/lineText", sr)
-
-	for line := range target.HashLineText {
-		hashLines[line] = target.HashLineText[line]
-	}
-	return
-}
-
-func reconstructCopyFromRemote(address, username, pathToFile string) (reconstructedFile string, err error) {
-	remoteHashLineNumbers, err := getRemoteCopyHashLineNumbers(address, username, pathToFile)
-	if err != nil {
-		return
-	}
-
-	hashLines, err := getRemoteCopyHashLines(remoteHashLineNumbers, address, username, pathToFile)
-	if err != nil {
-		return
-	}
-
-	// reconstruct the file
-	numberLines := 0
-	for h := range remoteHashLineNumbers {
-		for _, lineNum := range remoteHashLineNumbers[h] {
-			if lineNum > numberLines {
-				numberLines = lineNum
-			}
-		}
-	}
-	log.Debugf("# lines: %d", numberLines)
-	lines := make([]string, numberLines+1)
-
-	for h := range remoteHashLineNumbers {
-		for _, lineNum := range remoteHashLineNumbers[h] {
-			lines[lineNum] = string(convertWindowsLineFeed.ReplaceAll(hashLines[h], []byte("\n")))
-		}
-	}
-
-	reconstructedFile = strings.Join(lines, "\n")
 	return
 }

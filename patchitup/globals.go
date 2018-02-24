@@ -1,10 +1,14 @@
 package patchitup
 
-import "path"
+import (
+	"path"
+
+	"github.com/schollz/utils"
+)
 
 var pathToCacheClient, pathToCacheServer string
 
 func init() {
-	pathToCacheClient = path.Join(UserHomeDir(), ".patchitup", "client")
-	pathToCacheServer = path.Join(UserHomeDir(), ".patchitup", "server")
+	pathToCacheClient = path.Join(utils.UserHomeDir(), ".patchitup", "client")
+	pathToCacheServer = path.Join(utils.UserHomeDir(), ".patchitup", "server")
 }
