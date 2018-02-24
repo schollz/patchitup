@@ -12,8 +12,9 @@ type serverRequest struct {
 }
 
 type serverResponse struct {
-	Message string `json:"message"`
-	Success bool   `json:"success"`
+	Message string      `json:"message"`
+	Success bool        `json:"success"`
+	Patches []patchFile `json:"patches" omitempty:"true"`
 }
 
 var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)

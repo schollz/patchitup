@@ -11,6 +11,7 @@ func main() {
 	var (
 		doDebug    bool
 		port       string
+		dataFolder string
 		server     bool
 		rebuild    bool
 		pathToFile string
@@ -22,6 +23,7 @@ func main() {
 	flag.StringVar(&pathToFile, "f", "", "path to the file to patch")
 	flag.StringVar(&username, "u", "", "username on the cloud")
 	flag.StringVar(&address, "s", "", "server name")
+	flag.StringVar(&dataFolder, "data", "", "folder to data (default $HOME/.patchitup)")
 	flag.BoolVar(&doDebug, "debug", false, "enable debugging")
 	flag.BoolVar(&server, "host", false, "enable hosting")
 	flag.BoolVar(&rebuild, "rebuild", false, "rebuild file")
@@ -43,6 +45,9 @@ func main() {
 		fmt.Println(latest)
 	} else {
 		p := patchitup.New(address, username)
+		if dataFolder != "" {
+			p.SetDataFolder(dataFolder)
+		}
 		err = p.PatchUp(pathToFile)
 	}
 	if err != nil {

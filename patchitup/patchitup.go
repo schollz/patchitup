@@ -43,16 +43,19 @@ type patchFile struct {
 	Timestamp int
 }
 
-func (p *Patchitup) Rebuild(pathToFile string) (latest string, err error) {
+// SetDataFolder will specify where to store the data
+func (p *Patchitup) SetDataFolder(folder string) {
+	os.MkdirAll(folder, 0755)
+	p.cacheFolder = folder
+}
+
+func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
 	// flush logs so that they show up
 	defer log.Flush()
 
 	log.Debug("rebuilding")
 
-	// generate the filename
-	_, p.filename = filepath.Split(pathToFile)
-
-	patches, err := p.getPatches()
+	patches, err := p.getPatches(filename)
 	if err != nil {
 		return
 	}
@@ -60,7 +63,7 @@ func (p *Patchitup) Rebuild(pathToFile string) (latest string, err error) {
 	for _, patch := range patches {
 		var patchBytes []byte
 		var patchString string
-		patchBytes, err = ioutil.ReadFile(patch.Filename)
+		patchBytes, err = ioutil.ReadFile(path.Join(p.cacheFolder, patch.Filename))
 		if err != nil {
 			return
 		}
@@ -81,7 +84,7 @@ func (p *Patchitup) Rebuild(pathToFile string) (latest string, err error) {
 }
 
 // getPatches will determine the hash of the latest file
-func (p *Patchitup) getPatches() (patchFiles []patchFile, err error) {
+func (p *Patchitup) getPatches(filename string) (patchFiles []patchFile, err error) {
 	files, err := ioutil.ReadDir(p.cacheFolder)
 	if err != nil {
 		return
@@ -89,7 +92,7 @@ func (p *Patchitup) getPatches() (patchFiles []patchFile, err error) {
 
 	m := make(map[int]patchFile)
 	for _, f := range files {
-		if !strings.HasPrefix(f.Name(), p.filename+".") {
+		if !strings.HasPrefix(f.Name(), filename+".") {
 			continue
 		}
 		g := strings.Split(f.Name(), ".")
@@ -97,7 +100,7 @@ func (p *Patchitup) getPatches() (patchFiles []patchFile, err error) {
 			continue
 		}
 		var err2 error
-		pf := patchFile{Filename: path.Join(p.cacheFolder, f.Name())}
+		pf := patchFile{Filename: f.Name()}
 		pf.Timestamp, err2 = strconv.Atoi(g[len(g)-1])
 		if err2 != nil {
 			continue
@@ -158,7 +161,7 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	}
 
 	// get current hash of the remote file and compare
-	localCopyOfRemoteText, err := p.Rebuild(pathToFile)
+	localCopyOfRemoteText, err := p.Rebuild(p.filename)
 	if err != nil {
 		return
 	}
