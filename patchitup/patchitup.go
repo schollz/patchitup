@@ -24,6 +24,7 @@ type Patchitup struct {
 	username      string
 	serverAddress string
 	cacheFolder   string
+	passphrase    string
 }
 
 func New(username string) (p *Patchitup) {
@@ -48,6 +49,16 @@ func (p *Patchitup) SetDataFolder(folder string) {
 
 func (p *Patchitup) SetServerAddress(address string) {
 	p.serverAddress = address
+}
+
+func (p *Patchitup) SetPassphrase(passphrase string) (err error) {
+	p.passphrase = passphrase
+	// if Exists(authFile) {
+	// 	currentHash, _ := ioutil.ReadFile(authFile)
+	// } else {
+	// 	ioutil.WriteFile(authFile, p.passphraseHash, 0755)
+	// }
+	return
 }
 
 // LatestHash returns the latest hash
@@ -82,7 +93,7 @@ func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
 		if err != nil {
 			return
 		}
-		patchString, err = decode(string(patchBytes))
+		patchString, err = decode(string(patchBytes), p.passphrase)
 		if err != nil {
 			return
 		}
@@ -194,7 +205,7 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 
 	// upload patches
 	patch := getPatch(localCopyOfRemoteText, localText)
-	encodedPatch := encode(patch)
+	encodedPatch := encode(patch, p.passphrase)
 
 	// filename.patchitupv1.HASH.TIMESTAMP
 	saveFilename := fmt.Sprintf("%s.patchitupv1.%s.%d",
@@ -256,7 +267,7 @@ func (p *Patchitup) Sync(filename string) (err error) {
 			err = err2
 			return
 		}
-		sr := serverRequest{Authentication: "todo", Patch: patch}
+		sr := serverRequest{Authentication: "alskdjf", Patch: patch}
 		response, err2 := request("POST", address, sr)
 		if err2 != nil {
 			log.Warn(err2)

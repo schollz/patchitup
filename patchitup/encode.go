@@ -12,7 +12,7 @@ import (
 	"github.com/schollz/utils"
 )
 
-func encode(s string) (encoded string) {
+func encode(s, passphrase string) (encoded string) {
 	// compress patch
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
@@ -27,7 +27,7 @@ func encode(s string) (encoded string) {
 	}
 
 	// encrypt patch
-	encrypted := utils.Encrypt(b.Bytes(), []byte(`1234`))
+	encrypted := utils.Encrypt(b.Bytes(), []byte(passphrase))
 
 	// convert to base64
 	encoded = base64.StdEncoding.EncodeToString(encrypted)
@@ -36,7 +36,7 @@ func encode(s string) (encoded string) {
 	return
 }
 
-func decode(s string) (decoded string, err error) {
+func decode(s, passphrase string) (decoded string, err error) {
 	// convert from base64
 	patchBytes, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
@@ -45,7 +45,7 @@ func decode(s string) (decoded string, err error) {
 	}
 
 	// decrypt
-	decrypted, err := utils.Decrypt(patchBytes, []byte(`1234`))
+	decrypted, err := utils.Decrypt(patchBytes, []byte(passphrase))
 	if err != nil {
 		return
 	}
