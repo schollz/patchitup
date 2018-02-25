@@ -6,15 +6,15 @@ import (
 )
 
 type serverRequest struct {
-	Username string `json:"username" binding:"required"`
-	Filename string `json:"filename" binding:"required"`
-	Patch    string `json:"patch"`
+	Authentication string `json:"authentication" binding:"required"`
+	Patch          string `json:"patch"`
 }
 
 type serverResponse struct {
 	Message string      `json:"message"`
 	Success bool        `json:"success"`
-	Patches []patchFile `json:"patches" omitempty:"true"`
+	Patch   string      `json:"patch,omitempty"`
+	Patches []patchFile `json:"patches,omitempty"`
 }
 
 var convertWindowsLineFeed = regexp.MustCompile(`\r?\n`)

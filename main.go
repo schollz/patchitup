@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 
 	"github.com/schollz/patchitup/patchitup"
 )
@@ -39,12 +40,19 @@ func main() {
 		patchitup.SetLogLevel("info")
 		err = patchitup.Run(port)
 	} else if rebuild {
-		p := patchitup.New(address, username)
+		p := patchitup.New(username)
+		p.SetServerAddress(address)
+		if dataFolder != "" {
+			p.SetDataFolder(dataFolder)
+		}
 		var latest string
-		latest, err = p.Rebuild(pathToFile)
+		_, filename := filepath.Split(pathToFile)
+		p.Sync(filename)
+		latest, err = p.Rebuild(filename)
 		fmt.Println(latest)
 	} else {
-		p := patchitup.New(address, username)
+		p := patchitup.New(username)
+		p.SetServerAddress(address)
 		if dataFolder != "" {
 			p.SetDataFolder(dataFolder)
 		}

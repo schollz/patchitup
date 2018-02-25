@@ -23,17 +23,14 @@ import (
 type Patchitup struct {
 	username      string
 	serverAddress string
-	filename      string
 	cacheFolder   string
-	hashLocal     string
 }
 
-func New(address, username string) (p *Patchitup) {
+func New(username string) (p *Patchitup) {
 	p = new(Patchitup)
 	p.cacheFolder = path.Join(utils.UserHomeDir(), ".patchitup", username)
 	os.MkdirAll(p.cacheFolder, 0755)
 	p.username = username
-	p.serverAddress = address
 	return p
 }
 
@@ -47,6 +44,24 @@ type patchFile struct {
 func (p *Patchitup) SetDataFolder(folder string) {
 	os.MkdirAll(folder, 0755)
 	p.cacheFolder = folder
+}
+
+func (p *Patchitup) SetServerAddress(address string) {
+	p.serverAddress = address
+}
+
+// LatestHash returns the latest hash
+func (p *Patchitup) LatestHash(filename string) (hash string, err error) {
+	patches, err := p.getPatches(filename)
+	if err != nil {
+		return
+	}
+	if len(patches) == 0 {
+		err = fmt.Errorf("no patches available for '%s'", filename)
+		return
+	}
+	hash = patches[len(patches)-1].Hash
+	return
 }
 
 func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
@@ -92,7 +107,7 @@ func (p *Patchitup) getPatches(filename string) (patchFiles []patchFile, err err
 
 	m := make(map[int]patchFile)
 	for _, f := range files {
-		if !strings.HasPrefix(f.Name(), filename+".") {
+		if !strings.HasPrefix(f.Name(), filename+".patchitupv1.") {
 			continue
 		}
 		g := strings.Split(f.Name(), ".")
@@ -133,7 +148,12 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	defer log.Flush()
 
 	// generate the filename
-	_, p.filename = filepath.Split(pathToFile)
+	_, filename := filepath.Split(pathToFile)
+
+	err = p.Sync(filename)
+	if err != nil {
+		log.Warn(err)
+	}
 
 	// first make sure the file to upload exists
 	if !utils.Exists(pathToFile) {
@@ -155,49 +175,139 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	localText = string(utils.Dos2Unix([]byte(localText)))
 
 	// get current hash
-	p.hashLocal = utils.Md5Sum(localText)
+	hashLocal := utils.Md5Sum(localText)
 	if err != nil {
 		return
 	}
 
 	// get current hash of the remote file and compare
-	localCopyOfRemoteText, err := p.Rebuild(p.filename)
+	localCopyOfRemoteText, err := p.Rebuild(filename)
 	if err != nil {
 		return
 	}
 	hashLocalCopyOfRemote := utils.Md5Sum(localCopyOfRemoteText)
 
-	if hashLocalCopyOfRemote == p.hashLocal {
+	if hashLocalCopyOfRemote == hashLocal {
 		log.Debug("hashes match, not doing anything")
 		return
 	}
 
 	// upload patches
 	patch := getPatch(localCopyOfRemoteText, localText)
-	err = p.uploadPatches(encode(patch))
-	if err != nil {
-		return err
-	} else {
-		log.Infof("patched %s (%2.1f%%) to remote '%s' for '%s'",
-			humanize.Bytes(uint64(len(patch))),
-			100*float64(len(patch))/float64(len(localText)),
-			p.filename,
-			p.username)
-	}
+	encodedPatch := encode(patch)
 
-	log.Info("remote server is up-to-date")
+	// filename.patchitupv1.HASH.TIMESTAMP
+	saveFilename := fmt.Sprintf("%s.patchitupv1.%s.%d",
+		filename,
+		hashLocal,
+		time.Now().UTC().UnixNano()/int64(time.Millisecond),
+	)
+	p.SavePatch(saveFilename, encodedPatch)
+	log.Infof("patched %s (%2.1f%%) to remote '%s' for '%s'",
+		humanize.Bytes(uint64(len(patch))),
+		100*float64(len(patch))/float64(len(localText)),
+		filename,
+		p.username)
+	err = p.Sync(filename)
 	return
 }
 
-// postToServer is generic function to post to the server
-func postToServer(address string, sr serverRequest) (target serverResponse, err error) {
+func (p *Patchitup) SavePatch(filename, patch string) (err error) {
+	// save to a file
+	err = ioutil.WriteFile(path.Join(p.cacheFolder, filename), []byte(patch), 0755)
+	return
+}
+
+func (p *Patchitup) LoadPatch(patchFilename string) (patch string, err error) {
+	// save to a file
+	patchBytes, err := ioutil.ReadFile(path.Join(p.cacheFolder, patchFilename))
+	if err == nil {
+		patch = string(patchBytes)
+	}
+	return
+}
+
+func (p *Patchitup) Sync(filename string) (err error) {
+	localPatches, err := p.getPatches(filename)
+	if err != nil {
+		return
+	}
+
+	address := fmt.Sprintf("%s/list/%s/%s", p.serverAddress, p.username, filename)
+	remote, err := request("GET", address, serverRequest{})
+	if err != nil {
+		return
+	}
+
+	// upload to server
+	remoteHas := make(map[string]struct{})
+	for _, patch := range remote.Patches {
+		remoteHas[patch.Hash] = struct{}{}
+	}
+	for _, localPatch := range localPatches {
+		if _, ok := remoteHas[localPatch.Hash]; ok {
+			continue
+		}
+		// server doesn't have
+		log.Debugf("uploading %s to server", localPatch.Filename)
+		address = fmt.Sprintf("%s/patch/%s/%s", p.serverAddress, p.username, localPatch.Filename)
+		patch, err2 := p.LoadPatch(localPatch.Filename)
+		if err2 != nil {
+			err = err2
+			return
+		}
+		sr := serverRequest{Authentication: "todo", Patch: patch}
+		response, err2 := request("POST", address, sr)
+		if err2 != nil {
+			log.Warn(err2)
+		}
+		if response.Success == false {
+			log.Warn(response.Message)
+		} else {
+			log.Debug(response.Message)
+		}
+	}
+
+	// download from server
+	localHas := make(map[string]struct{})
+	for _, patch := range localPatches {
+		localHas[patch.Hash] = struct{}{}
+	}
+	for _, remotePatch := range remote.Patches {
+		if _, ok := localHas[remotePatch.Hash]; ok {
+			continue
+		}
+		// server doesn't have
+		log.Debugf("downloading %s from server", remotePatch.Filename)
+		address = fmt.Sprintf("%s/patch/%s/%s", p.serverAddress, p.username, remotePatch.Filename)
+		sr := serverRequest{}
+		response, err2 := request("GET", address, sr)
+		if err2 != nil {
+			log.Warn(err2)
+		}
+		if response.Success == false {
+			log.Warn(response.Message)
+		} else {
+			log.Debug(response.Message)
+			err2 := p.SavePatch(remotePatch.Filename, response.Patch)
+			if err2 != nil {
+				err = err2
+				return
+			}
+		}
+	}
+	return
+}
+
+// request is generic function to post to the server
+func request(requestType string, address string, sr serverRequest) (target serverResponse, err error) {
 	payloadBytes, err := json.Marshal(sr)
 	if err != nil {
 		return
 	}
 	body := bytes.NewReader(payloadBytes)
 
-	req, err := http.NewRequest("POST", address, body)
+	req, err := http.NewRequest(requestType, address, body)
 	if err != nil {
 		return
 	}
@@ -211,6 +321,7 @@ func postToServer(address string, sr serverRequest) (target serverResponse, err 
 
 	err = json.NewDecoder(resp.Body).Decode(&target)
 	if err != nil {
+		err = errors.Wrap(err, "could not unmarshal server request")
 		return
 	}
 	if !target.Success {
@@ -221,33 +332,13 @@ func postToServer(address string, sr serverRequest) (target serverResponse, err 
 }
 
 // getLatestHash will get latest hash from server
-func (p *Patchitup) getLatestHash() (hashRemote string, err error) {
+func (p *Patchitup) getLatestHash(filename string) (hashRemote string, err error) {
 	sr := serverRequest{
-		Username: p.username,
-		Filename: p.filename,
+		Authentication: "",
 	}
-	target, err := postToServer(p.serverAddress+"/hash", sr)
+
+	address := fmt.Sprintf("%s/hash/%s/%s", p.serverAddress, p.username, filename)
+	target, err := request("GET", address, sr)
 	hashRemote = target.Message
-	return
-}
-
-// uploadPatches will upload the patch to the server
-func (p *Patchitup) uploadPatches(patch string) (err error) {
-	filename := fmt.Sprintf("%s.%s.%d",
-		p.filename,
-		p.hashLocal,
-		time.Now().UTC().UnixNano()/int64(time.Millisecond),
-	)
-	err = ioutil.WriteFile(path.Join(p.cacheFolder, filename), []byte(patch), 0755)
-	if err != nil {
-		return
-	}
-	sr := serverRequest{
-		Username: p.username,
-		Filename: filename,
-		Patch:    patch,
-	}
-	_, err = postToServer(p.serverAddress+"/patch", sr)
-
 	return
 }
