@@ -116,7 +116,7 @@ func handlerListPatches(c *gin.Context) {
 	patches, message, err := func(c *gin.Context) (patches []Patch, message string, err error) {
 		username := c.Param("username")
 		filename := c.Param("filename")
-
+		// TODO AUTHENTICATE
 		err = authenticate(username, sr.Authentication)
 		if err != nil {
 			return
