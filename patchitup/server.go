@@ -113,13 +113,20 @@ func handlerGetPatch(c *gin.Context) {
 }
 
 func handlerListPatches(c *gin.Context) {
-	username := c.Param("username")
-	filename := c.Param("filename")
+	patches, message, err := func(c *gin.Context) (patches []Patch, message string, err error) {
+		username := c.Param("username")
+		filename := c.Param("filename")
 
-	p := New(username)
-	// p.SetDataFolder(folder)
-	patches, err := p.getPatches(filename)
-	message := fmt.Sprintf("got %d patches", len(patches))
+		err = authenticate(username, sr.Authentication)
+		if err != nil {
+			return
+		}
+		p := New(username)
+		// p.SetDataFolder(folder)
+		patches, err := p.getPatches(filename)
+		message = fmt.Sprintf("got %d patches", len(patches))
+		return
+	}(c)
 	if err != nil {
 		err = errors.Wrap(err, "problem getting patches")
 		message = err.Error()
@@ -171,6 +178,10 @@ func handlerPostPatch(c *gin.Context) {
 			err = errors.New("no filename supplied")
 			return
 		}
+		err = authenticate(username, sr.Authentication)
+		if err != nil {
+			return
+		}
 
 		p := New(username)
 		// p.SetDataFolder(folder)
@@ -186,6 +197,29 @@ func handlerPostPatch(c *gin.Context) {
 		Success: err == nil,
 	}
 	c.JSON(http.StatusOK, sr)
+}
+
+func authenticate(username, signature string) (err error) {
+	p := New(username)
+	// p.SetDataFolder(folder)
+	pubkeyFile := path.Join(p.cacheFolder, "pub.key")
+	if !utils.Exists(pubkeyFile) {
+		err = errors.New("need to register")
+		return
+	} else {
+		pubkeyBytes, _ := ioutil.ReadFile(pubkeyFile)
+		sender, err2 := keypair.FromPublic(string(pubkeyBytes))
+		if err2 != nil {
+			err = errors.Wrap(err, "bad key planted")
+			return
+		}
+		err = sharedKey.Validate(signature, sender)
+		if err != nil {
+			err = errors.Wrap(err, "incorrect user for uploading")
+			return
+		}
+	}
+	return
 }
 
 // func handlerGetPatch(c *gin.Context) {

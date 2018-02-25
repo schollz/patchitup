@@ -80,6 +80,7 @@ func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
 
 	patches, err := p.getPatches(filename)
 	if err != nil {
+		log.Debug(err)
 		return
 	}
 	latest = ""
@@ -88,14 +89,17 @@ func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
 		var patchString string
 		patchBytes, err = ioutil.ReadFile(path.Join(p.cacheFolder, patch.Filename))
 		if err != nil {
+			log.Debug(err)
 			return
 		}
 		patchString, err = p.decode(string(patchBytes))
 		if err != nil {
+			log.Debug(err)
 			return
 		}
 		latest, err = patchText(latest, patchString)
 		if err != nil {
+			log.Debug(err)
 			return
 		}
 		if utils.Md5Sum(latest) != patch.Hash {
@@ -160,7 +164,7 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 
 	err = p.Sync(filename)
 	if err != nil {
-		log.Warn(err)
+		return
 	}
 
 	// first make sure the file to upload exists
@@ -246,8 +250,13 @@ func (p *Patchitup) Sync(filename string) (err error) {
 		return
 	}
 
+	signature, err := p.key.Signature(sharedKey)
+	if err != nil {
+		return
+	}
+
 	address := fmt.Sprintf("%s/list/%s/%s", p.serverAddress, p.username, filename)
-	remote, err := request("GET", address, serverRequest{})
+	remote, err := request("GET", address, serverRequest{Authentication: signature})
 	if err != nil {
 		return
 	}

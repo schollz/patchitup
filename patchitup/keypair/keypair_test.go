@@ -104,7 +104,10 @@ func TestSigning(t *testing.T) {
 	// bob generates a signature
 	signature, err := bob.Signature(shared)
 	assert.Nil(t, err)
-	fmt.Println(signature)
+	fmt.Println("signature:", signature)
+	signature, err = bob.Signature(shared)
+	assert.Nil(t, err)
+	fmt.Println("signature:", signature)
 
 	// someone has bob's public address
 	bobsPublicAddress := bob.Public
