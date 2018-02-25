@@ -7,6 +7,7 @@ import (
 
 type serverRequest struct {
 	Authentication string `json:"authentication" binding:"required"`
+	PublicKey      string `json:"public_key"`
 	Patch          string `json:"patch"`
 }
 

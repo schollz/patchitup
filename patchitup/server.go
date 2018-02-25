@@ -2,13 +2,17 @@ package patchitup
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
 	log "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/schollz/patchitup/patchitup/keypair"
+	"github.com/schollz/utils"
 )
 
 var ServerDataFolder string
@@ -23,6 +27,7 @@ func Run(port string) (err error) {
 	r.HEAD("/", func(c *gin.Context) { // handler for the uptime robot
 		c.String(http.StatusOK, "OK")
 	})
+	r.POST("/register/:username", handlerRegister)         // post a patch
 	r.POST("/patch/:username/:filename", handlerPostPatch) // post a patch
 	r.GET("/patch/:username/:filename", handlerGetPatch)   // patch a file
 	r.GET("/list/:username/:filename", handlerListPatches) // list patches
@@ -30,6 +35,55 @@ func Run(port string) (err error) {
 	log.Infof("Running at http://0.0.0.0:" + port)
 	err = r.Run(":" + port)
 	return
+}
+
+func handlerRegister(c *gin.Context) {
+	message, err := func(c *gin.Context) (message string, err error) {
+		username := c.Param("username")
+		var sr serverRequest
+		err = c.ShouldBindJSON(&sr)
+		if err != nil {
+			return
+		}
+		if len(username) == 0 {
+			err = errors.New("no username supplied")
+			return
+		}
+		if sr.PublicKey == sharedKey.Public {
+			err = errors.New("must have different than shared public key")
+			return
+		}
+		kp, err := keypair.FromPublic(sr.PublicKey)
+		if err != nil {
+			return
+		}
+		err = sharedKey.Validate(sr.Authentication, kp)
+		if err != nil {
+			return
+		}
+
+		p := New(username)
+		pubKeyFile := path.Join(p.cacheFolder, "pub.key")
+		if utils.Exists(pubKeyFile) {
+			currentPubkey, _ := ioutil.ReadFile(pubKeyFile)
+			if string(currentPubkey) != sr.PublicKey {
+				err = errors.New("name already registered")
+			}
+		} else {
+			err = ioutil.WriteFile(pubKeyFile, []byte(sr.PublicKey), 0755)
+		}
+
+		return
+	}(c)
+	if err != nil {
+		message = err.Error()
+	}
+
+	sr := serverResponse{
+		Message: message,
+		Success: err == nil,
+	}
+	c.JSON(http.StatusOK, sr)
 }
 
 func handlerGetPatch(c *gin.Context) {

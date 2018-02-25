@@ -41,6 +41,7 @@ func main() {
 		err = patchitup.Run(port)
 	} else if rebuild {
 		p := patchitup.New(username)
+		p.SetPassphrase("1234")
 		p.SetServerAddress(address)
 		if dataFolder != "" {
 			p.SetDataFolder(dataFolder)
@@ -52,9 +53,14 @@ func main() {
 		fmt.Println(latest)
 	} else {
 		p := patchitup.New(username)
+		p.SetPassphrase("1234")
 		p.SetServerAddress(address)
 		if dataFolder != "" {
 			p.SetDataFolder(dataFolder)
+		}
+		err = p.Register()
+		if err != nil {
+			fmt.Println(err)
 		}
 		err = p.PatchUp(pathToFile)
 	}

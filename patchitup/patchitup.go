@@ -17,6 +17,7 @@ import (
 	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
+	"github.com/schollz/patchitup/patchitup/keypair"
 	"github.com/schollz/utils"
 )
 
@@ -25,6 +26,7 @@ type Patchitup struct {
 	serverAddress string
 	cacheFolder   string
 	passphrase    string
+	key           keypair.KeyPair
 }
 
 func New(username string) (p *Patchitup) {
@@ -33,6 +35,11 @@ func New(username string) (p *Patchitup) {
 	os.MkdirAll(p.cacheFolder, 0755)
 	p.username = username
 	return p
+}
+
+func (p *Patchitup) SetPassphrase(passphrase string) {
+	p.passphrase = passphrase
+	p.key = keypair.NewDeterministic(p.username + ":" + p.passphrase)
 }
 
 type patchFile struct {
@@ -49,16 +56,6 @@ func (p *Patchitup) SetDataFolder(folder string) {
 
 func (p *Patchitup) SetServerAddress(address string) {
 	p.serverAddress = address
-}
-
-func (p *Patchitup) SetPassphrase(passphrase string) (err error) {
-	p.passphrase = passphrase
-	// if Exists(authFile) {
-	// 	currentHash, _ := ioutil.ReadFile(authFile)
-	// } else {
-	// 	ioutil.WriteFile(authFile, p.passphraseHash, 0755)
-	// }
-	return
 }
 
 // LatestHash returns the latest hash
@@ -93,7 +90,7 @@ func (p *Patchitup) Rebuild(filename string) (latest string, err error) {
 		if err != nil {
 			return
 		}
-		patchString, err = decode(string(patchBytes), p.passphrase)
+		patchString, err = p.decode(string(patchBytes))
 		if err != nil {
 			return
 		}
@@ -198,6 +195,8 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 	}
 	hashLocalCopyOfRemote := utils.Md5Sum(localCopyOfRemoteText)
 
+	log.Debug(hashLocal)
+	log.Debug(hashLocalCopyOfRemote)
 	if hashLocalCopyOfRemote == hashLocal {
 		log.Debug("hashes match, not doing anything")
 		return
@@ -205,7 +204,10 @@ func (p *Patchitup) PatchUp(pathToFile string) (err error) {
 
 	// upload patches
 	patch := getPatch(localCopyOfRemoteText, localText)
-	encodedPatch := encode(patch, p.passphrase)
+	encodedPatch, err := p.encode(patch)
+	if err != nil {
+		return
+	}
 
 	// filename.patchitupv1.HASH.TIMESTAMP
 	saveFilename := fmt.Sprintf("%s.patchitupv1.%s.%d",
@@ -250,6 +252,11 @@ func (p *Patchitup) Sync(filename string) (err error) {
 		return
 	}
 
+	signature, err := p.key.Signature(sharedKey)
+	if err != nil {
+		return
+	}
+
 	// upload to server
 	remoteHas := make(map[string]struct{})
 	for _, patch := range remote.Patches {
@@ -267,7 +274,7 @@ func (p *Patchitup) Sync(filename string) (err error) {
 			err = err2
 			return
 		}
-		sr := serverRequest{Authentication: "alskdjf", Patch: patch}
+		sr := serverRequest{Authentication: signature, Patch: patch}
 		response, err2 := request("POST", address, sr)
 		if err2 != nil {
 			log.Warn(err2)
@@ -310,6 +317,27 @@ func (p *Patchitup) Sync(filename string) (err error) {
 	return
 }
 
+func (p *Patchitup) Register() (err error) {
+	address := fmt.Sprintf("%s/register/%s", p.serverAddress, p.username)
+	signature, err := p.key.Signature(sharedKey)
+	if err != nil {
+		return
+	}
+	response, err := request("POST", address,
+		serverRequest{
+			Authentication: signature,
+			PublicKey:      p.key.Public,
+		})
+
+	if err != nil {
+		return
+	}
+	if response.Success == false {
+		err = errors.New(response.Message)
+	}
+	return
+}
+
 // request is generic function to post to the server
 func request(requestType string, address string, sr serverRequest) (target serverResponse, err error) {
 	payloadBytes, err := json.Marshal(sr)
@@ -344,8 +372,13 @@ func request(requestType string, address string, sr serverRequest) (target serve
 
 // getLatestHash will get latest hash from server
 func (p *Patchitup) getLatestHash(filename string) (hashRemote string, err error) {
+	signature, err := p.key.Signature(sharedKey)
+	if err != nil {
+		return
+	}
+
 	sr := serverRequest{
-		Authentication: "",
+		Authentication: signature,
 	}
 
 	address := fmt.Sprintf("%s/hash/%s/%s", p.serverAddress, p.username, filename)

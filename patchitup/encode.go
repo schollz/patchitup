@@ -9,25 +9,27 @@ import (
 	log "github.com/cihub/seelog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
-	"github.com/schollz/utils"
 )
 
-func encode(s, passphrase string) (encoded string) {
+func (p *Patchitup) encode(s string) (encoded string, err error) {
 	// compress patch
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
-	if _, err := gz.Write([]byte(s)); err != nil {
-		panic(err)
+	if _, err = gz.Write([]byte(s)); err != nil {
+		return
 	}
-	if err := gz.Flush(); err != nil {
-		panic(err)
+	if err = gz.Flush(); err != nil {
+		return
 	}
-	if err := gz.Close(); err != nil {
-		panic(err)
+	if err = gz.Close(); err != nil {
+		return
 	}
 
 	// encrypt patch
-	encrypted := utils.Encrypt(b.Bytes(), []byte(passphrase))
+	encrypted, err := p.key.Encrypt(b.Bytes(), p.key)
+	if err != nil {
+		return
+	}
 
 	// convert to base64
 	encoded = base64.StdEncoding.EncodeToString(encrypted)
@@ -36,7 +38,7 @@ func encode(s, passphrase string) (encoded string) {
 	return
 }
 
-func decode(s, passphrase string) (decoded string, err error) {
+func (p *Patchitup) decode(s string) (decoded string, err error) {
 	// convert from base64
 	patchBytes, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
@@ -45,7 +47,7 @@ func decode(s, passphrase string) (decoded string, err error) {
 	}
 
 	// decrypt
-	decrypted, err := utils.Decrypt(patchBytes, []byte(passphrase))
+	decrypted, err := p.key.Decrypt(patchBytes, p.key)
 	if err != nil {
 		return
 	}
