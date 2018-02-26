@@ -37,13 +37,11 @@ Then you can patch a file:
 ```
 $ patchitup -u me -s http://localhost:8002 -f SOMEFILE
 2018-02-23 08:56:44 [INFO] patched 2.4 kB (62.8%) to remote 'SOMEFILE' for 'me'
-2018-02-23 08:56:44 [INFO] remote server is up-to-date
 
 $ vim SOMEFILE # make some edits
 
 $ patchitup -u me -s http://localhost:8002 -f SOMEFILE
 2018-02-23 08:57:40 [INFO] patched 408 B (9.9%) to remote 'SOMEFILE' for 'me'
-2018-02-23 08:57:40 [INFO] remote server is up-to-date
 ```
 
 The first time you patch will basically just send up the gzipped file. Subsequent edits will just send up the patches. The percentage (e.g. `9.9%`) specifies the percentage of the entire file size that is being sent (to get an idea of bandwidth savings). The server also will log bandwidth usage.

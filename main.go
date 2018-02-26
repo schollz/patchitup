@@ -3,26 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/schollz/gopass"
 	"github.com/schollz/patchitup/patchitup"
 )
 
+var (
+	doDebug    bool
+	port       string
+	dataFolder string
+	server     bool
+	rebuild    bool
+	pathToFile string
+	username   string
+	address    string
+	passphrase string
+)
+
 func main() {
-	var (
-		doDebug    bool
-		port       string
-		dataFolder string
-		server     bool
-		rebuild    bool
-		pathToFile string
-		username   string
-		address    string
-		passphrase string
-	)
 
 	flag.StringVar(&port, "port", "8002", "port to run server")
 	flag.StringVar(&pathToFile, "f", "", "path to the file to patch")
@@ -40,54 +37,49 @@ func main() {
 	} else {
 		patchitup.SetLogLevel("info")
 	}
-	var err error
-	if server {
-		patchitup.SetLogLevel("info")
-		err = patchitup.Run(port)
-	} else if rebuild {
-		p := patchitup.New(username)
-		if passphrase == "" {
-			fmt.Print("Passphrase: ")
-			pass, err := gopass.GetPasswd()
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			passphrase = strings.TrimSpace(string(pass))
-		}
-		p.SetPassphrase(passphrase)
-		p.SetServerAddress(address)
-		if dataFolder != "" {
-			p.SetDataFolder(dataFolder)
-		}
-		var latest string
-		_, filename := filepath.Split(pathToFile)
-		p.Sync(filename)
-		latest, err = p.Rebuild(filename)
-		fmt.Println(latest)
-	} else {
-		p := patchitup.New(username)
-		if passphrase == "" {
-			fmt.Print("Passphrase: ")
-			pass, err := gopass.GetPasswd()
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			passphrase = strings.TrimSpace(string(pass))
-		}
-		p.SetPassphrase(passphrase)
-		p.SetServerAddress(address)
-		if dataFolder != "" {
-			p.SetDataFolder(dataFolder)
-		}
-		err = p.Register()
-		if err != nil {
-			fmt.Println(err)
-		}
-		err = p.PatchUp(pathToFile)
+
+	if dataFolder != "" {
+		patchitup.DataFolder = dataFolder
 	}
+
+	err := run()
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func run() error {
+	if server {
+		patchitup.SetLogLevel("info")
+		err := patchitup.Run(port)
+		if err != nil {
+			return err
+		}
+	} else if rebuild {
+		p, err := patchitup.New(patchitup.Configuration{
+			PathToFile:    pathToFile,
+			ServerAddress: address,
+		})
+		if err != nil {
+			return err
+		}
+		latest, err := p.Rebuild()
+		if err != nil {
+			return err
+		}
+		fmt.Println(latest)
+	} else {
+		p, err := patchitup.New(patchitup.Configuration{
+			PathToFile:    pathToFile,
+			ServerAddress: address,
+		})
+		if err != nil {
+			return err
+		}
+		err = p.PatchUp()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

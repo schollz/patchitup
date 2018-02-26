@@ -6,15 +6,23 @@ import (
 )
 
 type serverRequest struct {
-	Authentication string `json:"authentication" binding:"required"`
-	PublicKey      string `json:"public_key"`
-	Patch          string `json:"patch"`
+	Signature string    `json:"signature" binding:"required"`
+	PublicKey string    `json:"public_key" binding:"required"`
+	Filename  string    `json:"filename"`
+	Patch     patchFile `json:"patch"`
+}
+
+type patchFile struct {
+	Filename  string
+	Patch     string
+	Hash      string
+	EpochTime int
 }
 
 type serverResponse struct {
 	Message string      `json:"message"`
 	Success bool        `json:"success"`
-	Patch   string      `json:"patch,omitempty"`
+	Patch   patchFile   `json:"patch,omitempty"`
 	Patches []patchFile `json:"patches,omitempty"`
 }
 
